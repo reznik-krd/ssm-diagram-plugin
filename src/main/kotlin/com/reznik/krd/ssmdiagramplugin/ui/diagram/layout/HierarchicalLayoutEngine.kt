@@ -25,10 +25,14 @@ class HierarchicalLayoutEngine {
     private val horizontalGap = 140
 
     /*
-     * Между уровнями тоже оставляем достаточно места
-     * для event / guard labels.
-     */
-    private val verticalGap = 120
+ * Между уровнями оставляем место для:
+ *
+ * - actions предыдущего transition;
+ * - event;
+ * - guard;
+ * - routing.
+ */
+    private val verticalGap = 180
 
     private val margin = 100
 

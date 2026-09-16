@@ -11,7 +11,10 @@ data class SsmChoice(
 data class SsmChoiceBranch(
     val target: String,
     val type: Type,
+
     val guard: SsmComponentReference? = null,
+    val actions: List<SsmAction> = emptyList(),
+
     val targetElement: PsiElement? = null
 ) {
 

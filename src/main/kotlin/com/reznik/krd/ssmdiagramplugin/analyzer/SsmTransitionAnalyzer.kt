@@ -9,6 +9,7 @@ import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ComponentReferenceRes
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ExpressionResolver
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ResolvedValue
 import com.reznik.krd.ssmdiagramplugin.model.SsmTransition
+import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 
 class SsmTransitionAnalyzer {
 
@@ -136,18 +137,12 @@ class SsmTransitionAnalyzer {
         /*
          * Action + errorAction.
          */
-        val actionExpressions =
+        val actions =
             chain
-                .findCall("action")
-                ?.argumentList
-                ?.expressions
-                .orEmpty()
-
-        val actionExpression =
-            actionExpressions.getOrNull(0)
-
-        val errorActionExpression =
-            actionExpressions.getOrNull(1)
+                .filter {
+                    it.methodExpression.referenceName == "action"
+                }
+                .mapNotNull(::parseAction)
 
         val event =
             eventExpression
@@ -157,13 +152,7 @@ class SsmTransitionAnalyzer {
             guardExpression
                 ?.let(componentResolver::resolve)
 
-        val action =
-            actionExpression
-                ?.let(componentResolver::resolve)
 
-        val errorAction =
-            errorActionExpression
-                ?.let(componentResolver::resolve)
 
         /*
          * Cartesian product.
@@ -185,16 +174,50 @@ class SsmTransitionAnalyzer {
 
                     event = event,
                     guard = guard,
-                    action = action,
-                    errorAction = errorAction,
+                    actions = actions,
 
                     sourceElement = source.source,
                     targetElement = target.source,
+
                     eventElement = eventExpression
-                        ?.let { expressionResolver.resolve(it).firstOrNull()?.source ?: it }
+                        ?.let {
+                            expressionResolver
+                                .resolve(it)
+                                .firstOrNull()
+                                ?.source
+                                ?: it
+                        }
                 )
             }
         }
+    }
+
+    private fun parseAction(
+        call: PsiMethodCallExpression
+    ): SsmAction? {
+
+        val arguments =
+            call.argumentList.expressions
+
+        val actionExpression =
+            arguments.getOrNull(0)
+                ?: return null
+
+        val errorActionExpression =
+            arguments.getOrNull(1)
+
+        val action =
+            componentResolver.resolve(actionExpression)
+                ?: return null
+
+        val errorAction =
+            errorActionExpression
+                ?.let(componentResolver::resolve)
+
+        return SsmAction(
+            action = action,
+            errorAction = errorAction
+        )
     }
 
     private fun resolve(

@@ -53,8 +53,7 @@ class DiagramGraphBuilder {
                 event = transition.event,
                 eventElement = transition.eventElement,
                 guard = transition.guard,
-                action = transition.action,
-                errorAction = transition.errorAction
+                actions = transition.actions
             )
         }
 
@@ -70,7 +69,8 @@ class DiagramGraphBuilder {
 
                     type = DiagramEdge.Type.CHOICE_BRANCH,
 
-                    guard = branch.guard
+                    guard = branch.guard,
+                    actions = branch.actions
                 )
             }
         }

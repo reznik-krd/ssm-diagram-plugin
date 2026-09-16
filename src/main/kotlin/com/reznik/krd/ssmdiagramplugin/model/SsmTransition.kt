@@ -7,10 +7,9 @@ data class SsmTransition(
     val target: String,
 
     val event: String? = null,
-
-    val action: SsmComponentReference? = null,
-    val errorAction: SsmComponentReference? = null,
     val guard: SsmComponentReference? = null,
+
+    val actions: List<SsmAction> = emptyList(),
 
     val sourceElement: PsiElement? = null,
     val targetElement: PsiElement? = null,

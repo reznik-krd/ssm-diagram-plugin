@@ -7,17 +7,19 @@ data class EdgeLayout(
 
     /**
      * Позиция event.
-     *
-     * Например:
-     * CREATED -- CHECK --> CHECKING
      */
     val eventLabelPosition: Point? = null,
 
     /**
      * Позиция guard.
-     *
-     * Guard стараемся располагать ближе
-     * к target конкретного transition.
      */
-    val guardLabelPosition: Point? = null
+    val guardLabelPosition: Point? = null,
+
+    /**
+     * Позиции actions этого transition.
+     *
+     * Action принадлежит edge,
+     * но визуально располагается под target.
+     */
+    val actionLabelPositions: List<Point> = emptyList()
 )

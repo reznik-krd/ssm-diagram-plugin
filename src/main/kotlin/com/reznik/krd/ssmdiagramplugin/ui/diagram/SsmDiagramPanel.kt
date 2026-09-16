@@ -4,6 +4,7 @@ import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
 import com.intellij.ui.JBColor
+import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 import com.reznik.krd.ssmdiagramplugin.model.StateMachineModel
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.builder.DiagramGraphBuilder
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.layout.DiagramLayout
@@ -44,6 +45,9 @@ class SsmDiagramPanel(
     private val layoutEngine =
         HierarchicalLayoutEngine()
 
+    private var graph: DiagramGraph? = null
+    private var layout: DiagramLayout? = null
+
     /*
      * Hover.
      */
@@ -52,10 +56,18 @@ class SsmDiagramPanel(
     private var hoveredGuardEdgeId: String? = null
 
     /*
-     * Реальные области отрисованных guard labels.
+     * Action отличается от EVENT/GUARD:
+     * на одном edge может находиться несколько actions.
      *
-     * key   = edge.id
-     * value = Rectangle label
+     * Поэтому идентификатор action:
+     *
+     * edgeId + actionIndex
+     */
+    private var hoveredAction:
+            Pair<String, Int>? = null
+
+    /*
+     * Реальные области отрисованных labels.
      */
     private val eventHitAreas =
         mutableMapOf<String, Rectangle>()
@@ -63,8 +75,8 @@ class SsmDiagramPanel(
     private val guardHitAreas =
         mutableMapOf<String, Rectangle>()
 
-    private var graph: DiagramGraph? = null
-    private var layout: DiagramLayout? = null
+    private val actionHitAreas =
+        mutableListOf<ActionHitArea>()
 
     /*
      * Zoom.
@@ -149,7 +161,63 @@ class SsmDiagramPanel(
     ) {
 
         /*
-         * Сначала проверяем event.
+         * 1. Action.
+         *
+         * Проверяем первым, потому что action является
+         * отдельным маленьким интерактивным элементом.
+         */
+        val actionHitArea =
+            findActionAt(
+                mouseX = event.x,
+                mouseY = event.y
+            )
+
+        val action =
+            actionHitArea
+                ?.let(::findAction)
+
+        val clickableAction =
+            action?.takeIf {
+                it.action.targetClass != null
+            }
+
+        if (
+            actionHitArea != null &&
+            clickableAction != null
+        ) {
+
+            val actionKey =
+                Pair(
+                    actionHitArea.edgeId,
+                    actionHitArea.actionIndex
+                )
+
+            val changed =
+                hoveredAction != actionKey ||
+                        hoveredEventEdgeId != null ||
+                        hoveredGuardEdgeId != null ||
+                        hoveredNodeId != null
+
+            hoveredAction = actionKey
+
+            hoveredEventEdgeId = null
+            hoveredGuardEdgeId = null
+            hoveredNodeId = null
+
+            cursor =
+                Cursor.getPredefinedCursor(
+                    Cursor.HAND_CURSOR
+                )
+
+            if (changed) {
+                repaint()
+            }
+
+            return
+        }
+
+        /*
+         * 2. Event.
          */
         val eventEdge =
             findEventEdgeAt(
@@ -167,8 +235,10 @@ class SsmDiagramPanel(
             val changed =
                 hoveredEventEdgeId != clickableEvent.id ||
                         hoveredGuardEdgeId != null ||
-                        hoveredNodeId != null
+                        hoveredNodeId != null ||
+                        hoveredAction != null
 
+            hoveredAction = null
             hoveredEventEdgeId = clickableEvent.id
             hoveredGuardEdgeId = null
             hoveredNodeId = null
@@ -186,7 +256,7 @@ class SsmDiagramPanel(
         }
 
         /*
-         * Затем проверяем guard.
+         * 3. Guard.
          */
         val guardEdge =
             findGuardEdgeAt(
@@ -195,10 +265,8 @@ class SsmDiagramPanel(
             )
 
         /*
-         * Hover показываем только если
-         * guard реально ведёт на PSI class.
-         *
-         * Например "otherwise" не кликабелен.
+         * "otherwise" не кликабелен,
+         * потому что у него guard == null.
          */
         val clickableGuard =
             guardEdge?.takeIf {
@@ -210,14 +278,13 @@ class SsmDiagramPanel(
             val changed =
                 hoveredGuardEdgeId != clickableGuard.id ||
                         hoveredEventEdgeId != null ||
-                        hoveredNodeId != null
+                        hoveredNodeId != null ||
+                        hoveredAction != null
 
+            hoveredAction = null
             hoveredEventEdgeId = null
-            hoveredGuardEdgeId =
-                clickableGuard.id
-
-            hoveredNodeId =
-                null
+            hoveredGuardEdgeId = clickableGuard.id
+            hoveredNodeId = null
 
             cursor =
                 Cursor.getPredefinedCursor(
@@ -232,9 +299,7 @@ class SsmDiagramPanel(
         }
 
         /*
-         * Guard не найден.
-         *
-         * Проверяем state.
+         * 4. State.
          */
         val node =
             findNodeAt(
@@ -253,14 +318,13 @@ class SsmDiagramPanel(
         val changed =
             hoveredNodeId != newHoveredNodeId ||
                     hoveredEventEdgeId != null ||
-                    hoveredGuardEdgeId != null
+                    hoveredGuardEdgeId != null ||
+                    hoveredAction != null
 
+        hoveredAction = null
         hoveredEventEdgeId = null
-        hoveredGuardEdgeId =
-            null
-
-        hoveredNodeId =
-            newHoveredNodeId
+        hoveredGuardEdgeId = null
+        hoveredNodeId = newHoveredNodeId
 
         cursor =
             if (clickableNode != null) {
@@ -281,11 +345,13 @@ class SsmDiagramPanel(
         val changed =
             hoveredNodeId != null ||
                     hoveredEventEdgeId != null ||
-                    hoveredGuardEdgeId != null
+                    hoveredGuardEdgeId != null ||
+                    hoveredAction != null
 
         hoveredNodeId = null
         hoveredEventEdgeId = null
         hoveredGuardEdgeId = null
+        hoveredAction = null
 
         cursor =
             Cursor.getDefaultCursor()
@@ -307,7 +373,34 @@ class SsmDiagramPanel(
         }
 
         /*
-         * Сначала event.
+         * 1. Action.
+         */
+        val actionHitArea =
+            findActionAt(
+                mouseX = event.x,
+                mouseY = event.y
+            )
+
+        val action =
+            actionHitArea
+                ?.let(::findAction)
+
+        val actionClass =
+            action
+                ?.action
+                ?.targetClass
+
+        if (actionClass != null) {
+
+            navigateToPsiElement(
+                actionClass
+            )
+
+            return
+        }
+
+        /*
+         * 2. Event.
          */
         val eventEdge =
             findEventEdgeAt(
@@ -328,7 +421,7 @@ class SsmDiagramPanel(
         }
 
         /*
-         * Затем guard.
+         * 3. Guard.
          */
         val guardEdge =
             findGuardEdgeAt(
@@ -351,7 +444,7 @@ class SsmDiagramPanel(
         }
 
         /*
-         * Потом state.
+         * 4. State.
          */
         val node =
             findNodeAt(
@@ -366,6 +459,51 @@ class SsmDiagramPanel(
     // Hit testing
     // -------------------------------------------------------------------------
 
+    private fun findActionAt(
+        mouseX: Int,
+        mouseY: Int
+    ): ActionHitArea? {
+
+        /*
+         * MouseEvent находится в screen-space,
+         * hit areas — в diagram-space.
+         */
+        val diagramX =
+            (mouseX / zoom).toInt()
+
+        val diagramY =
+            (mouseY / zoom).toInt()
+
+        return actionHitAreas
+            .firstOrNull { hitArea ->
+
+                hitArea.bounds.contains(
+                    diagramX,
+                    diagramY
+                )
+            }
+    }
+
+    private fun findAction(
+        hitArea: ActionHitArea
+    ): SsmAction? {
+
+        val graph =
+            this.graph ?: return null
+
+        val edge =
+            graph.edges
+                .firstOrNull {
+                    it.id == hitArea.edgeId
+                }
+                ?: return null
+
+        return edge.actions
+            .getOrNull(
+                hitArea.actionIndex
+            )
+    }
+
     private fun findNodeAt(
         mouseX: Int,
         mouseY: Int
@@ -377,14 +515,6 @@ class SsmDiagramPanel(
         val layout =
             this.layout ?: return null
 
-        /*
-         * Координаты MouseEvent находятся
-         * в screen-space.
-         *
-         * Layout находится в diagram-space.
-         *
-         * Поэтому учитываем zoom.
-         */
         val diagramX =
             (mouseX / zoom).toInt()
 
@@ -422,6 +552,7 @@ class SsmDiagramPanel(
             eventHitAreas
                 .entries
                 .firstOrNull { (_, bounds) ->
+
                     bounds.contains(
                         diagramX,
                         diagramY
@@ -444,10 +575,6 @@ class SsmDiagramPanel(
         val graph =
             this.graph ?: return null
 
-        /*
-         * Возвращаем координаты мыши
-         * обратно в diagram-space.
-         */
         val diagramX =
             (mouseX / zoom).toInt()
 
@@ -596,9 +723,11 @@ class SsmDiagramPanel(
         hoveredNodeId = null
         hoveredEventEdgeId = null
         hoveredGuardEdgeId = null
+        hoveredAction = null
 
         eventHitAreas.clear()
         guardHitAreas.clear()
+        actionHitAreas.clear()
 
         updatePreferredSize()
 
@@ -652,6 +781,7 @@ class SsmDiagramPanel(
              */
             eventHitAreas.clear()
             guardHitAreas.clear()
+            actionHitAreas.clear()
 
             /*
              * Сначала edges.
@@ -763,9 +893,6 @@ class SsmDiagramPanel(
 
         /*
          * Event.
-         *
-         * Пока event только отображаем.
-         * Интерактивность добавим следующим этапом.
          */
         edge.event?.let { event ->
 
@@ -824,17 +951,170 @@ class SsmDiagramPanel(
                     )
                 }
         }
+
+        /*
+         * Actions.
+         *
+         * Error actions намеренно
+         * не отображаем.
+         *
+         * Каждый action имеет собственный index,
+         * поэтому несколько actions одного edge
+         * остаются независимыми.
+         */
+        edge.actions
+            .zip(edgeLayout.actionLabelPositions)
+            .forEachIndexed { index, (ssmAction, position) ->
+
+                drawActionLabel(
+                    g2 = g2,
+                    edge = edge,
+                    actionIndex = index,
+                    action = ssmAction,
+                    position = position
+                )
+            }
+    }
+
+    private fun drawActionLabel(
+        g2: Graphics2D,
+        edge: DiagramEdge,
+        actionIndex: Int,
+        action: SsmAction,
+        position: Point
+    ) {
+
+        val oldFont =
+            g2.font
+
+        val oldColor =
+            g2.color
+
+        val oldStroke =
+            g2.stroke
+
+        g2.font =
+            oldFont.deriveFont(
+                Font.PLAIN,
+                11f
+            )
+
+        val text =
+            "⚡ ${action.action.name}"
+
+        val metrics =
+            g2.fontMetrics
+
+        val textWidth =
+            metrics.stringWidth(text)
+
+        val textHeight =
+            metrics.height
+
+        val horizontalPadding = 7
+        val verticalPadding = 3
+
+        val bounds =
+            Rectangle(
+                position.x -
+                        textWidth / 2 -
+                        horizontalPadding,
+
+                position.y -
+                        metrics.ascent -
+                        verticalPadding,
+
+                textWidth +
+                        horizontalPadding * 2,
+
+                textHeight +
+                        verticalPadding * 2
+            )
+
+        /*
+         * Запоминаем реальную область именно
+         * этого конкретного action.
+         */
+        actionHitAreas +=
+            ActionHitArea(
+                edgeId = edge.id,
+                actionIndex = actionIndex,
+                bounds = bounds
+            )
+
+        val hovered =
+            hoveredAction ==
+                    Pair(
+                        edge.id,
+                        actionIndex
+                    )
+
+        /*
+         * Background.
+         */
+        g2.color =
+            if (hovered) {
+                JBColor(
+                    Color(225, 235, 250),
+                    Color(65, 75, 90)
+                )
+            } else {
+                JBColor.PanelBackground
+            }
+
+        g2.fillRoundRect(
+            bounds.x,
+            bounds.y,
+            bounds.width,
+            bounds.height,
+            8,
+            8
+        )
+
+        /*
+         * Hover border.
+         */
+        if (hovered) {
+
+            g2.color =
+                JBColor.GRAY
+
+            g2.stroke =
+                BasicStroke(1f)
+
+            g2.drawRoundRect(
+                bounds.x,
+                bounds.y,
+                bounds.width,
+                bounds.height,
+                8,
+                8
+            )
+        }
+
+        /*
+         * Text.
+         */
+        g2.color =
+            if (hovered) {
+                JBColor.foreground()
+            } else {
+                JBColor.GRAY
+            }
+
+        g2.drawString(
+            text,
+            position.x - textWidth / 2,
+            position.y
+        )
+
+        g2.font = oldFont
+        g2.color = oldColor
+        g2.stroke = oldStroke
     }
 
     /**
-     * Label chip.
-     *
-     * Одновременно:
-     *
-     * 1. рисует фон;
-     * 2. рисует текст;
-     * 3. для guard сохраняет Rectangle;
-     * 4. подсвечивает guard при hover.
+     * Общий label chip для EVENT / GUARD.
      */
     private fun drawLabelChip(
         g2: Graphics2D,
@@ -850,11 +1130,9 @@ class SsmDiagramPanel(
         val oldStroke =
             g2.stroke
 
-        /*
-         * Event немного заметнее.
-         *
-         * Guard компактнее.
-         */
+        val oldColor =
+            g2.color
+
         g2.font =
             when (kind) {
 
@@ -865,6 +1143,12 @@ class SsmDiagramPanel(
                     )
 
                 LabelKind.GUARD ->
+                    oldFont.deriveFont(
+                        Font.PLAIN,
+                        11f
+                    )
+
+                LabelKind.ACTION ->
                     oldFont.deriveFont(
                         Font.PLAIN,
                         11f
@@ -897,10 +1181,6 @@ class SsmDiagramPanel(
 
         /*
          * position.y — baseline текста.
-         *
-         * Оставляем ту же систему координат,
-         * которая была у тебя до интерактивности,
-         * чтобы labels визуально не прыгнули.
          */
         val chipY =
             position.y -
@@ -916,31 +1196,44 @@ class SsmDiagramPanel(
             )
 
         /*
-         * Запоминаем hit area guard.
-         *
-         * В том числе для otherwise.
-         * Но otherwise потом не считается clickable,
-         * потому что edge.guard == null.
+         * Hit areas.
          */
         if (edgeId != null) {
+
             when (kind) {
+
                 LabelKind.EVENT ->
-                    eventHitAreas[edgeId] = bounds
+                    eventHitAreas[edgeId] =
+                        bounds
 
                 LabelKind.GUARD ->
-                    guardHitAreas[edgeId] = bounds
+                    guardHitAreas[edgeId] =
+                        bounds
+
+                /*
+                 * ACTION имеет отдельный renderer,
+                 * потому что на edge их может быть несколько.
+                 */
+                LabelKind.ACTION ->
+                    Unit
             }
         }
 
         val hovered =
             when (kind) {
+
                 LabelKind.EVENT ->
                     edgeId != null &&
-                            edgeId == hoveredEventEdgeId
+                            edgeId ==
+                            hoveredEventEdgeId
 
                 LabelKind.GUARD ->
                     edgeId != null &&
-                            edgeId == hoveredGuardEdgeId
+                            edgeId ==
+                            hoveredGuardEdgeId
+
+                LabelKind.ACTION ->
+                    false
             }
 
         /*
@@ -966,7 +1259,7 @@ class SsmDiagramPanel(
         )
 
         /*
-         * При hover добавляем небольшую рамку.
+         * Hover border.
          */
         if (hovered) {
 
@@ -1001,6 +1294,9 @@ class SsmDiagramPanel(
                     } else {
                         JBColor.GRAY
                     }
+
+                LabelKind.ACTION ->
+                    JBColor.foreground()
             }
 
         g2.drawString(
@@ -1009,14 +1305,9 @@ class SsmDiagramPanel(
             position.y
         )
 
-        /*
-         * Возвращаем Graphics2D в исходное состояние.
-         */
-        g2.font =
-            oldFont
-
-        g2.stroke =
-            oldStroke
+        g2.font = oldFont
+        g2.stroke = oldStroke
+        g2.color = oldColor
     }
 
     // -------------------------------------------------------------------------
@@ -1395,6 +1686,19 @@ class SsmDiagramPanel(
 
     private enum class LabelKind {
         EVENT,
-        GUARD
+        GUARD,
+        ACTION
     }
+
+    /**
+     * Hit area конкретного action.
+     *
+     * edgeId недостаточно, потому что один transition
+     * может содержать несколько actions.
+     */
+    private data class ActionHitArea(
+        val edgeId: String,
+        val actionIndex: Int,
+        val bounds: Rectangle
+    )
 }

@@ -7,6 +7,7 @@ import com.intellij.psi.PsiReferenceExpression
 import com.intellij.psi.util.PsiTreeUtil
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ComponentReferenceResolver
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ExpressionResolver
+import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 import com.reznik.krd.ssmdiagramplugin.model.SsmChoice
 import com.reznik.krd.ssmdiagramplugin.model.SsmChoiceBranch
 
@@ -99,21 +100,53 @@ class SsmChoiceAnalyzer {
             call.argumentList.expressions
 
         val targetExpression =
-            arguments.getOrNull(0) ?: return null
+            arguments.getOrNull(0)
+                ?: return null
 
         val guardExpression =
             arguments.getOrNull(1)
 
-        val target = expressionResolver
-            .resolve(targetExpression)
-            .firstOrNull()
-            ?: return null
+        val actionExpression =
+            arguments.getOrNull(2)
+
+        val errorActionExpression =
+            arguments.getOrNull(3)
+
+        val target =
+            expressionResolver
+                .resolve(targetExpression)
+                .firstOrNull()
+                ?: return null
+
+        val action =
+            actionExpression
+                ?.let(componentResolver::resolve)
+
+        val errorAction =
+            errorActionExpression
+                ?.let(componentResolver::resolve)
+
+        val actions =
+            if (action != null) {
+                listOf(
+                    SsmAction(
+                        action = action,
+                        errorAction = errorAction
+                    )
+                )
+            } else {
+                emptyList()
+            }
 
         return SsmChoiceBranch(
             target = target.name,
             type = type,
+
             guard = guardExpression
                 ?.let(componentResolver::resolve),
+
+            actions = actions,
+
             targetElement = target.source
         )
     }
@@ -122,19 +155,50 @@ class SsmChoiceAnalyzer {
         call: PsiMethodCallExpression
     ): SsmChoiceBranch? {
 
+        val arguments =
+            call.argumentList.expressions
+
         val targetExpression =
-            call.argumentList.expressions.firstOrNull()
+            arguments.getOrNull(0)
                 ?: return null
 
-        val target = expressionResolver
-            .resolve(targetExpression)
-            .firstOrNull()
-            ?: return null
+        val actionExpression =
+            arguments.getOrNull(1)
+
+        val errorActionExpression =
+            arguments.getOrNull(2)
+
+        val target =
+            expressionResolver
+                .resolve(targetExpression)
+                .firstOrNull()
+                ?: return null
+
+        val action =
+            actionExpression
+                ?.let(componentResolver::resolve)
+
+        val errorAction =
+            errorActionExpression
+                ?.let(componentResolver::resolve)
+
+        val actions =
+            if (action != null) {
+                listOf(
+                    SsmAction(
+                        action = action,
+                        errorAction = errorAction
+                    )
+                )
+            } else {
+                emptyList()
+            }
 
         return SsmChoiceBranch(
             target = target.name,
             type = SsmChoiceBranch.Type.LAST,
             guard = null,
+            actions = actions,
             targetElement = target.source
         )
     }

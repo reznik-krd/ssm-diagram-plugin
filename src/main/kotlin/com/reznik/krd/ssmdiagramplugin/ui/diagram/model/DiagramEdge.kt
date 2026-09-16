@@ -1,6 +1,7 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.model
 
 import com.intellij.psi.PsiElement
+import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 import com.reznik.krd.ssmdiagramplugin.model.SsmComponentReference
 
 data class DiagramEdge(
@@ -13,8 +14,8 @@ data class DiagramEdge(
     val event: String? = null,
     val eventElement: PsiElement? = null,
     val guard: SsmComponentReference? = null,
-    val action: SsmComponentReference? = null,
-    val errorAction: SsmComponentReference? = null
+
+    val actions: List<SsmAction> = emptyList()
 ) {
 
     enum class Type {

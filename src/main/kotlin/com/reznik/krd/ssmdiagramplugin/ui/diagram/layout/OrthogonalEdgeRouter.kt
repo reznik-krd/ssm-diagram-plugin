@@ -41,6 +41,38 @@ class OrthogonalEdgeRouter {
          * Для back edges.
          */
         private const val BACK_EDGE_GAP = 70
+
+        /*
+ * Первый action располагается
+ * под target state.
+ */
+        private const val ACTION_TARGET_OFFSET_Y = 24
+
+        /*
+         * Расстояние между несколькими actions.
+         */
+        private const val ACTION_LABEL_GAP = 22
+    }
+
+    private fun createActionPositions(
+        edge: DiagramEdge,
+        target: NodeLayout,
+        parallelOffset: Int
+    ): List<Point> {
+
+        if (edge.actions.isEmpty()) {
+            return emptyList()
+        }
+
+        return edge.actions.mapIndexed { index, _ ->
+
+            Point(
+                target.center.x + parallelOffset,
+                target.bottom.y +
+                        ACTION_TARGET_OFFSET_Y +
+                        index * ACTION_LABEL_GAP
+            )
+        }
     }
 
     fun route(
@@ -229,6 +261,13 @@ class OrthogonalEdgeRouter {
                         edge = edge,
                         target = target,
                         parallelOffset = parallelOffset
+                    ),
+
+                actionLabelPositions =
+                    createActionPositions(
+                        edge = edge,
+                        target = target,
+                        parallelOffset = parallelOffset
                     )
             )
         }
@@ -286,6 +325,13 @@ class OrthogonalEdgeRouter {
 
             guardLabelPosition =
                 createGuardPosition(
+                    edge = edge,
+                    target = target,
+                    parallelOffset = parallelOffset
+                ),
+
+            actionLabelPositions =
+                createActionPositions(
                     edge = edge,
                     target = target,
                     parallelOffset = parallelOffset
@@ -357,13 +403,21 @@ class OrthogonalEdgeRouter {
                 null
             }
 
+        val actionLabelPositions =
+            createActionPositions(
+                edge = edge,
+                target = target,
+                parallelOffset = parallelOffset
+            )
+
         return EdgeLayout(
             points = listOf(
                 start,
                 end
             ),
             eventLabelPosition = eventPosition,
-            guardLabelPosition = guardPosition
+            guardLabelPosition = guardPosition,
+            actionLabelPositions = actionLabelPositions,
         )
     }
 
@@ -430,6 +484,13 @@ class OrthogonalEdgeRouter {
                 null
             }
 
+        val actionLabelPositions =
+            createActionPositions(
+                edge = edge,
+                target = target,
+                parallelOffset = parallelOffset
+            )
+
         return EdgeLayout(
             points = listOf(
                 start,
@@ -438,7 +499,8 @@ class OrthogonalEdgeRouter {
                 end
             ),
             eventLabelPosition = eventPosition,
-            guardLabelPosition = guardPosition
+            guardLabelPosition = guardPosition,
+            actionLabelPositions = actionLabelPositions,
         )
     }
 
