@@ -1,0 +1,27 @@
+<idea-plugin>
+    <id>com.reznik.krd.ssm-diagram-plugin</id>
+    <name>Ssm-diagram-plugin</name>
+    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <depends>com.intellij.java</depends>
+    <resource-bundle>messages.MyMessageBundle</resource-bundle>
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+                id="SSM Diagram"
+                factoryClass="com.reznik.krd.ssmdiagramplugin.ui.SsmDiagramToolWindowFactory"
+                anchor="right"
+                icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+    </extensions>
+
+    <actions>
+        <action
+                id="com.reznik.krd.ssmdiagramplugin.GenerateSsmDiagramAction"
+                class="com.reznik.krd.ssmdiagramplugin.action.GenerateSsmDiagramAction"
+                text="Generate SSM Diagram"
+                description="Generate a diagram from Spring StateMachine configuration">
+            <add-to-group
+                    group-id="ProjectViewPopupMenu"
+                    anchor="last"/>
+        </action>
+    </actions>
+
+</idea-plugin>
