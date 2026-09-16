@@ -1,5 +1,10 @@
 package com.reznik.krd.ssmdiagramplugin.ui
 
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.psi.PsiElement
+import java.awt.Cursor
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import com.intellij.ui.JBColor
 import com.reznik.krd.ssmdiagramplugin.model.StateMachineModel
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.builder.DiagramGraphBuilder
@@ -20,8 +25,12 @@ import javax.swing.JPanel
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import com.intellij.openapi.project.Project
+import java.awt.event.MouseMotionAdapter
 
-class SsmDiagramPanel : JPanel() {
+class SsmDiagramPanel(
+    private val project: Project
+) : JPanel() {
 
     private val graphBuilder =
         DiagramGraphBuilder()
@@ -31,6 +40,7 @@ class SsmDiagramPanel : JPanel() {
 
     private val layoutEngine =
         HierarchicalLayoutEngine()
+    private var hoveredNodeId: String? = null
 
     private var graph: DiagramGraph? = null
 
@@ -66,6 +76,176 @@ class SsmDiagramPanel : JPanel() {
                 zoomOut()
             }
         }
+
+        addMouseListener(
+            object : MouseAdapter() {
+
+                override fun mouseClicked(
+                    event: MouseEvent
+                ) {
+                    handleMouseClick(event)
+                }
+
+                override fun mouseExited(
+                    event: MouseEvent
+                ) {
+                    clearHover()
+                }
+            }
+        )
+
+        addMouseMotionListener(
+            object : MouseMotionAdapter() {
+
+                override fun mouseMoved(
+                    event: MouseEvent
+                ) {
+                    handleMouseMove(event)
+                }
+            }
+        )
+    }
+
+    private fun handleMouseMove(
+        event: MouseEvent
+    ) {
+
+        val node =
+            findNodeAt(
+                mouseX = event.x,
+                mouseY = event.y
+            )
+
+        /*
+         * INITIAL / END технически тоже являются nodes,
+         * но кликать по ним сейчас некуда.
+         *
+         * Поэтому hover показываем только для state,
+         * у которого действительно есть source.
+         */
+        val clickableNode =
+            node?.takeIf {
+                it.state?.source != null
+            }
+
+        val newHoveredNodeId =
+            clickableNode?.id
+
+        /*
+         * repaint нужен только если hover
+         * реально изменился.
+         */
+        if (hoveredNodeId != newHoveredNodeId) {
+
+            hoveredNodeId =
+                newHoveredNodeId
+
+            repaint()
+        }
+
+        cursor =
+            if (clickableNode != null) {
+                Cursor.getPredefinedCursor(
+                    Cursor.HAND_CURSOR
+                )
+            } else {
+                Cursor.getDefaultCursor()
+            }
+    }
+
+    private fun clearHover() {
+
+        if (hoveredNodeId == null) {
+            return
+        }
+
+        hoveredNodeId = null
+
+        cursor =
+            Cursor.getDefaultCursor()
+
+        repaint()
+    }
+
+    private fun handleMouseClick(
+        event: MouseEvent
+    ) {
+
+        /*
+         * Нас интересует только левая кнопка.
+         */
+        if (event.button != MouseEvent.BUTTON1) {
+            return
+        }
+
+        val node =
+            findNodeAt(
+                mouseX = event.x,
+                mouseY = event.y
+            ) ?: return
+
+        navigateToNode(node)
+    }
+
+    private fun findNodeAt(
+        mouseX: Int,
+        mouseY: Int
+    ): DiagramNode? {
+
+        val graph =
+            this.graph ?: return null
+
+        val layout =
+            this.layout ?: return null
+
+        /*
+         * Переводим экранные координаты
+         * обратно в координаты DiagramLayout.
+         */
+        val diagramX =
+            (mouseX / zoom).toInt()
+
+        val diagramY =
+            (mouseY / zoom).toInt()
+
+        return graph.nodes.firstOrNull { node ->
+
+            val nodeLayout =
+                layout.nodes[node.id]
+                    ?: return@firstOrNull false
+
+            diagramX >= nodeLayout.x &&
+                    diagramX <= nodeLayout.x + nodeLayout.width &&
+                    diagramY >= nodeLayout.y &&
+                    diagramY <= nodeLayout.y + nodeLayout.height
+        }
+    }
+
+    private fun navigateToNode(
+        node: DiagramNode
+    ) {
+
+        val source =
+            node.state?.source
+                ?: return
+
+        navigateToPsiElement(source)
+    }
+
+    private fun navigateToPsiElement(
+        element: PsiElement
+    ) {
+
+        val virtualFile =
+            element.containingFile
+                ?.virtualFile
+                ?: return
+
+        OpenFileDescriptor(
+            project,
+            virtualFile,
+            element.textOffset
+        ).navigate(true)
     }
 
     private fun zoomIn() {
@@ -532,8 +712,18 @@ class SsmDiagramPanel : JPanel() {
         height: Int
     ) {
 
+        val hovered =
+            node.id == hoveredNodeId
+
         g2.color =
-            JBColor.PanelBackground
+            if (hovered) {
+                JBColor(
+                    java.awt.Color(235, 242, 252),
+                    java.awt.Color(55, 65, 78)
+                )
+            } else {
+                JBColor.PanelBackground
+            }
 
         g2.fillRoundRect(
             position.x,
@@ -545,10 +735,20 @@ class SsmDiagramPanel : JPanel() {
         )
 
         g2.color =
-            JBColor.GRAY
+            if (hovered) {
+                JBColor.foreground()
+            } else {
+                JBColor.GRAY
+            }
 
         g2.stroke =
-            BasicStroke(1.4f)
+            BasicStroke(
+                if (hovered) {
+                    2.2f
+                } else {
+                    1.4f
+                }
+            )
 
         g2.drawRoundRect(
             position.x,
@@ -633,8 +833,19 @@ class SsmDiagramPanel : JPanel() {
                 centerY
             )
 
+        val hovered =
+            node.id == hoveredNodeId
         g2.color =
-            JBColor.PanelBackground
+            if (hovered) {
+                JBColor(
+                    java.awt.Color(235, 242, 252),
+                    java.awt.Color(55, 65, 78)
+                )
+            } else {
+                JBColor.PanelBackground
+            }
+
+
 
         g2.fillPolygon(
             xPoints,
@@ -647,6 +858,22 @@ class SsmDiagramPanel : JPanel() {
 
         g2.stroke =
             BasicStroke(1.4f)
+
+        g2.color =
+            if (hovered) {
+                JBColor.foreground()
+            } else {
+                JBColor.GRAY
+            }
+
+        g2.stroke =
+            BasicStroke(
+                if (hovered) {
+                    2.2f
+                } else {
+                    1.4f
+                }
+            )
 
         g2.drawPolygon(
             xPoints,

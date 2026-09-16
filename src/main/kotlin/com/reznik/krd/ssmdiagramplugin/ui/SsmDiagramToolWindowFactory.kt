@@ -17,7 +17,7 @@ class SsmDiagramToolWindowFactory : ToolWindowFactory {
         toolWindow: ToolWindow
     ) {
 
-        val diagramPanel = SsmDiagramPanel()
+        val diagramPanel =   SsmDiagramPanel(project)
 
         val scrollPane = JBScrollPane(diagramPanel)
 
