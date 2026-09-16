@@ -1,111 +1,776 @@
-# IntelliJ Platform Plugin Template
+# SSM Diagram Plugin
 
-[![Twitter Follow](https://img.shields.io/badge/follow-%40JBPlatform-1DA1F2?logo=twitter)](https://twitter.com/JBPlatform)
-[![Developers Forum](https://img.shields.io/badge/JetBrains%20Platform-Join-blue)][jb:forum]
+> IntelliJ IDEA plugin for visualizing **Spring Statemachine**
+> configurations directly inside the IDE.
 
-## Plugin template structure
+SSM Diagram Plugin analyzes Java-based Spring Statemachine configuration
+using IntelliJ PSI and builds an interactive diagram of states,
+transitions, events, guards, actions and choice branches.
 
-A generated project contains the following content structure:
+The goal is simple: **make large StateMachine configurations easier to
+understand, navigate and maintain without leaving IntelliJ IDEA.**
 
+------------------------------------------------------------------------
+
+## Why this plugin?
+
+As a Spring Statemachine configuration grows, understanding the complete
+workflow from Java code becomes increasingly difficult. A configuration
+may contain dozens of states, transitions, events, guards, actions,
+choice pseudo-states and `first / then / last` branches.
+
+The plugin converts that configuration into a visual graph directly
+inside IntelliJ IDEA.
+
+``` text
+Spring Statemachine Java configuration
+                  │
+                  ▼
+          SSM Diagram Plugin
+                  │
+       ┌──────────┼──────────┐
+       ▼          ▼          ▼
+     States   Transitions   Choices
+                  │
+          Events / Guards
+                  │
+               Actions
+                  ▼
+          Interactive diagram
 ```
-.
-├── .run/                   Predefined Run/Debug Configurations
-├── build/                  Output build directory
-├── gradle
-│   ├── wrapper/            Gradle Wrapper
-├── src                     Plugin sources
-│   ├── main
-│   │   ├── kotlin/         Kotlin production sources
-│   │   └── resources/      Resources - plugin.xml, icons, messages
-├── .gitignore              Git ignoring rules
-├── build.gradle.kts        Gradle build configuration
-├── gradle.properties       Gradle configuration properties
-├── gradlew                 *nix Gradle Wrapper script
-├── gradlew.bat             Windows Gradle Wrapper script
-├── README.md               README
-└── settings.gradle.kts     Gradle project settings
+
+No external website, Graphviz installation or running Spring application
+is required.
+
+------------------------------------------------------------------------
+
+## Features
+
+### Automatic configuration discovery
+
+The plugin searches the current project for Spring Statemachine
+configuration classes and makes discovered configurations available from
+the **SSM Diagram** Tool Window.
+
+### Diagram generation
+
+The generated graph can contain:
+
+-   states;
+-   initial state;
+-   explicit end states;
+-   transitions;
+-   events;
+-   guards;
+-   actions;
+-   choice states;
+-   choice branches;
+-   `otherwise` branches.
+
+### Choice visualization
+
+Conditional branches such as `.first(...)`, `.then(...)` and
+`.last(...)` are represented explicitly, so branching logic is visible
+in the diagram instead of being hidden inside fluent Java configuration.
+
+### Actions
+
+Transition actions are displayed separately near the transition target.
+Multiple actions remain separate rather than being merged into one long
+label.
+
+Error actions are preserved by the internal semantic model but are
+intentionally not displayed on the main diagram to keep it readable.
+
+### Interactive source navigation
+
+Where source information can be resolved, diagram elements can navigate
+back to project code:
+
+-   states;
+-   events;
+-   guards;
+-   actions.
+
+The diagram therefore works not only as documentation, but also as an
+additional navigation layer over a StateMachine implementation.
+
+### Readable graph transformation
+
+Real StateMachine graphs are not always visually pleasant. For states
+with many incoming transitions, the plugin can create **visual copies**
+of the same logical state to reduce unnecessarily long or tangled
+connections.
+
+``` text
+        A                 B                 C
+        │                 │                 │
+        ▼                 ▼                 ▼
+   ┌─────────┐       ┌─────────┐       ┌─────────┐
+   │  READY  │       │  READY  │       │  READY  │
+   └─────────┘       └─────────┘       └─────────┘
+        │                 │                 │
+        └──────── logicalId = READY ────────┘
 ```
 
-In addition to the configuration files, the most crucial part is the `src` directory, which contains our implementation and the manifest for our
-plugin – [plugin.xml][file:plugin.xml].
+These copies are only visual representations. They do **not** create
+additional Spring states or alter StateMachine semantics.
 
-> [!NOTE]
-> To use Java in your plugin, create the `/src/main/java` directory.
+### Hierarchical layout
 
-## Plugin configuration file
+The current layout engine places nodes in layers from top to bottom. The
+pipeline includes graph-level calculation, ordering inside layers,
+coordinate assignment, orthogonal routing, parallel-edge separation and
+label positioning.
 
-The plugin configuration file is a [plugin.xml][file:plugin.xml] file located in the `src/main/resources/META-INF` directory.
-It provides general information about the plugin, its dependencies, extensions, and listeners.
+### Zoom and viewport controls
 
-You can read more about this file in the [Plugin Configuration File][docs:plugin.xml] section of our documentation.
+The Tool Window provides:
 
-If you're still not quite sure what this is all about, read our introduction: [What is the IntelliJ Platform?][docs:intro]
+-   zoom out;
+-   current zoom percentage / reset to 100%;
+-   zoom in;
+-   **Fit**;
+-   **Center**;
+-   `Ctrl` / `Cmd` + mouse wheel zoom.
 
-$H$H Predefined Run/Debug configurations
+### Generate, Refresh and Clear
 
-Within the default project structure, there is a `.run` directory provided containing predefined *Run/Debug configurations* that expose corresponding Gradle tasks:
+-   **Generate** --- analyzes the configuration selected in the
+    ComboBox.
+-   **Refresh** --- re-analyzes the configuration currently displayed.
+-   **Clear** --- removes the current diagram without clearing
+    configuration selection.
 
-| Configuration name | Description                                                                                                                                                                         |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Run Plugin         | Runs [`:runIde`][gh:intellij-platform-gradle-plugin-runIde] IntelliJ Platform Gradle Plugin task. Use the *Debug* icon for plugin debugging.                                        |
-| Run Tests          | Runs [`:test`][gradle:lifecycle-tasks] Gradle task.                                                                                                                                 |
-| Run Verifications  | Runs [`:verifyPlugin`][gh:intellij-platform-gradle-plugin-verifyPlugin] IntelliJ Platform Gradle Plugin task to check the plugin compatibility against the specified IntelliJ IDEs. |
+### Generate from Project View
 
-> [!NOTE]
-> You can find the logs from the running task in the `idea.log` tab.
+A diagram can also be generated directly from the IntelliJ project tree:
 
-## Publishing the plugin
+**Right click Java configuration → Generate SSM Diagram**
 
-> [!TIP]
-> Make sure to follow all guidelines listed in [Publishing a Plugin][docs:publishing] to follow all recommended and required steps.
+### Background PSI analysis
 
-Releasing a plugin to [JetBrains Marketplace](https://plugins.jetbrains.com) is a straightforward operation that uses the `publishPlugin` Gradle task provided by
-the [intellij-platform-gradle-plugin][gh:intellij-platform-gradle-plugin-docs].
+Configuration discovery and generation can require PSI resolution and
+IntelliJ indexes. These operations are performed through non-blocking
+read actions in smart mode instead of doing expensive analysis directly
+on the Swing EDT.
 
-You can also upload the plugin to the [JetBrains Plugin Repository](https://plugins.jetbrains.com/plugin/upload) manually via UI.
+The Tool Window can display statuses such as:
 
-## Useful links
+``` text
+◌ Searching configurations...
+◌ Generating diagram...
+◌ Refreshing diagram...
+```
 
-- [IntelliJ Platform SDK Plugin SDK][docs]
-- [IntelliJ Platform Gradle Plugin Documentation][gh:intellij-platform-gradle-plugin-docs]
-- [IntelliJ Platform Explorer][jb:ipe]
-- [JetBrains Marketplace Quality Guidelines][jb:quality-guidelines]
-- [IntelliJ Platform UI Guidelines][jb:ui-guidelines]
-- [JetBrains Marketplace Paid Plugins][jb:paid-plugins]
-- [IntelliJ SDK Code Samples][gh:code-samples]
+------------------------------------------------------------------------
 
-[docs]: https://plugins.jetbrains.com/docs/intellij
+## Tool Window
 
-[docs:intro]: https://plugins.jetbrains.com/docs/intellij/intellij-platform.html?from=IJPluginTemplate
+The plugin adds the **SSM Diagram** Tool Window to IntelliJ IDEA.
 
-[docs:plugin.xml]: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html?from=IJPluginTemplate
+``` text
+┌──────────────────────────────────────────────────────────┐
+│ SSM Diagram                                              │
+├──────────────────────────────────────────────────────────┤
+│ Configuration: [ CarSMConfig ▼ ] [Generate][Refresh][Clear]
+│ View:          [ − ] [100%] [ + ] [Fit] [Center]        │
+│                                                          │
+│                  ●                                       │
+│                  │                                       │
+│                  ▼                                       │
+│             ┌───────────┐                                │
+│             │  CREATED  │                                │
+│             └───────────┘                                │
+│                  │                                       │
+│             CREATE_EVENT                                 │
+│                  │                                       │
+│             [validGuard]                                 │
+│                  ▼                                       │
+│             ┌───────────┐                                │
+│             │ PROCESSING│                                │
+│             └───────────┘                                │
+│                  │                                       │
+│             ⚡ processAction                             │
+└──────────────────────────────────────────────────────────┘
+```
 
-[docs:publishing]: https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate
+The actual diagram is rendered entirely inside IntelliJ IDEA.
 
-[file:plugin.xml]: ./src/main/resources/META-INF/plugin.xml
+------------------------------------------------------------------------
 
-[gh:code-samples]: https://github.com/JetBrains/intellij-sdk-code-samples
+# How it works
 
-[gh:intellij-platform-gradle-plugin]: https://github.com/JetBrains/intellij-platform-gradle-plugin
+## High-level architecture
 
-[gh:intellij-platform-gradle-plugin-docs]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
+The plugin separates Spring Statemachine semantics from visualization.
 
-[gh:intellij-platform-gradle-plugin-runIde]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#runIde
+``` text
+                    Java source
+                        │
+                        ▼
+              ┌───────────────────┐
+              │ SSM Config Finder │
+              └─────────┬─────────┘
+                        │
+                        ▼
+              ┌───────────────────┐
+              │   PSI Analyzer    │
+              └─────────┬─────────┘
+                        │
+          ┌─────────────┼─────────────┐
+          ▼             ▼             ▼
+       States      Transitions      Choices
+                        │
+                        ▼
+              ┌───────────────────┐
+              │ StateMachineModel │
+              └─────────┬─────────┘
+                        │
+                        ▼
+              ┌───────────────────┐
+              │DiagramGraphBuilder│
+              └─────────┬─────────┘
+                        │
+                        ▼
+              Canonical DiagramGraph
+                        │
+                        ▼
+           ┌─────────────────────────┐
+           │ReadableGraphTransformer │
+           └────────────┬────────────┘
+                        │
+                        ▼
+               Visual DiagramGraph
+                        │
+                        ▼
+           ┌─────────────────────────┐
+           │HierarchicalLayoutEngine │
+           └────────────┬────────────┘
+                        │
+                        ▼
+           ┌─────────────────────────┐
+           │ OrthogonalEdgeRouter    │
+           └────────────┬────────────┘
+                        │
+                        ▼
+                 DiagramLayout
+                        │
+                        ▼
+                 Swing Renderer
+                        │
+                        ▼
+              IntelliJ Tool Window
+```
 
-[gh:intellij-platform-gradle-plugin-verifyPlugin]: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-tasks.html#verifyPlugin
+## 1. Configuration discovery
 
-[gradle:lifecycle-tasks]: https://docs.gradle.org/current/userguide/java_plugin.html#lifecycle_tasks
+The plugin uses IntelliJ's project model, PSI and inheritance indexes to
+find supported Spring Statemachine configuration classes based on
+`EnumStateMachineConfigurerAdapter`.
 
-[jb:github]: https://github.com/JetBrains/.github/blob/main/profile/README.md
+The Spring application does not need to be started and the application
+context is not instantiated.
 
-[jb:forum]: https://platform.jetbrains.com/
+## 2. PSI analysis
 
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
+Java source is analyzed through the **IntelliJ PSI (Program Structure
+Interface)**.
 
-[jb:paid-plugins]: https://plugins.jetbrains.com/docs/marketplace/paid-plugins-marketplace.html
+The plugin therefore avoids relying on formatting-dependent source-text
+parsing and regular expressions for understanding Java configuration.
 
-[jb:quality-guidelines]: https://plugins.jetbrains.com/docs/marketplace/quality-guidelines.html
+The analyzer extracts a normalized structure such as:
 
-[jb:ipe]: https://jb.gg/ipe
+``` text
+StateMachine
+├── states
+├── initial state
+├── end states
+├── transitions
+│   ├── source
+│   ├── target
+│   ├── event
+│   ├── guard
+│   └── actions
+└── choices
+    ├── source
+    ├── first
+    ├── then
+    └── last
+```
 
-[jb:ui-guidelines]: https://jetbrains.github.io/ui
+The expression resolver supports common forms including enum constants,
+local variables, loop parameters and `List.of(...)` constructs.
+
+## 3. Semantic model
+
+PSI analysis produces a normalized `StateMachineModel`.
+
+``` text
+StateMachineModel
+│
+├── SsmState
+│
+├── SsmTransition
+│   ├── source
+│   ├── target
+│   ├── event
+│   ├── guard
+│   └── List<SsmAction>
+│
+└── SsmChoice
+    └── branches
+```
+
+This model represents the meaning of the Spring configuration rather
+than positions on screen.
+
+## 4. Canonical graph
+
+`DiagramGraphBuilder` converts `StateMachineModel` into a canonical
+visual graph.
+
+At this stage:
+
+``` text
+one logical state = one graph node
+```
+
+The builder also creates visual markers for the initial state and
+explicit Spring end states.
+
+## 5. Readability transformation
+
+`ReadableGraphTransformer` may transform the canonical graph into a more
+readable visual graph. Visual state copies keep the same `logicalId`,
+preserving the distinction between **logical identity** and **visual
+identity**.
+
+## 6. Hierarchical layout
+
+`HierarchicalLayoutEngine` arranges the visual graph approximately as:
+
+``` text
+Level 0                 INITIAL
+                           │
+Level 1                 CREATED
+                           │
+                ┌──────────┴──────────┐
+                ▼                     ▼
+Level 2      PROCESSING             FAILED
+                │
+                ▼
+Level 3       FINISHED
+```
+
+Nodes are positioned before edge routing begins.
+
+## 7. Edge routing
+
+`OrthogonalEdgeRouter` creates routes between final node positions and
+calculates locations for transition labels.
+
+Conceptually:
+
+``` text
+       EVENT
+         ↓
+      [GUARD]
+         ↓
+ ┌──────────────┐
+ │ TARGET STATE │
+ └──────────────┘
+         ↓
+   ⚡ firstAction
+   ⚡ secondAction
+```
+
+Parallel transitions between the same source and target receive separate
+offsets.
+
+## 8. Rendering and interaction
+
+The renderer receives already prepared graph geometry. Its main
+responsibilities are drawing, hit areas, hover behavior and interaction.
+
+Parsing, semantic analysis and graph layout remain outside the renderer.
+
+------------------------------------------------------------------------
+
+# Threading model
+
+IntelliJ PSI and indexes have strict threading requirements. Potentially
+expensive PSI/index operations must not block the Swing Event Dispatch
+Thread.
+
+The plugin follows this model:
+
+``` text
+                  EDT / Swing
+                      │
+            user presses Generate
+                      │
+                      ▼
+          Non-blocking Read Action
+                      │
+                 Smart Mode
+                      │
+          ┌───────────┼───────────┐
+          ▼           ▼           ▼
+         PSI       indexes      resolve
+          └───────────┼───────────┘
+                      │
+                      ▼
+             StateMachineModel
+                      │
+                      ▼
+                  EDT / Swing
+                      │
+                      ▼
+                show diagram
+```
+
+------------------------------------------------------------------------
+
+# Project structure
+
+The structure may evolve as development continues, but responsibilities
+are divided approximately as follows:
+
+``` text
+src/main/kotlin/com/reznik/krd/ssmdiagramplugin/
+│
+├── action/
+│   └── IntelliJ actions
+│
+├── analyzer/
+│   ├── configuration discovery
+│   ├── PSI analysis
+│   ├── transition analysis
+│   ├── choice analysis
+│   └── expression/component resolution
+│
+├── model/
+│   └── StateMachine semantic model
+│
+├── service/
+│   └── background analysis orchestration
+│
+└── ui/
+    ├── Tool Window
+    └── diagram/
+        ├── graph model
+        ├── graph builder
+        ├── transformations
+        ├── layout
+        ├── routing
+        ├── rendering
+        └── interaction/navigation
+```
+
+------------------------------------------------------------------------
+
+# Requirements
+
+The current development setup uses:
+
+-   **Java 21**;
+-   **Gradle**;
+-   **IntelliJ Platform Gradle Plugin**;
+-   IntelliJ IDEA Java support;
+-   a project containing Spring Statemachine Java configuration.
+
+The exact supported IntelliJ build range is controlled by the
+Gradle/plugin metadata of the project.
+
+------------------------------------------------------------------------
+
+# Build from source
+
+## 1. Clone the repository
+
+``` bash
+git clone <repository-url>
+cd ssm-diagram-plugin
+```
+
+Replace `<repository-url>` with the repository URL.
+
+## 2. Build the plugin
+
+macOS / Linux:
+
+``` bash
+./gradlew clean buildPlugin
+```
+
+Windows:
+
+``` powershell
+gradlew.bat clean buildPlugin
+```
+
+The distributable ZIP is generated in:
+
+``` text
+build/distributions/
+```
+
+For example:
+
+``` text
+build/distributions/ssm-diagram-plugin-1.0-SNAPSHOT.zip
+```
+
+**Do not unpack the ZIP before installing it into IntelliJ IDEA.**
+
+------------------------------------------------------------------------
+
+# Run in a development IDE
+
+To launch an IntelliJ sandbox with the plugin installed:
+
+``` bash
+./gradlew runIde
+```
+
+This starts a separate IntelliJ IDEA instance suitable for plugin
+development and testing.
+
+------------------------------------------------------------------------
+
+# Verify the plugin
+
+Before sharing a build with testers:
+
+``` bash
+./gradlew clean buildPlugin
+./gradlew verifyPlugin
+```
+
+Typical development flow:
+
+``` text
+change code
+    │
+    ▼
+./gradlew runIde
+    │
+    ▼
+manual testing
+    │
+    ▼
+./gradlew clean buildPlugin
+    │
+    ▼
+./gradlew verifyPlugin
+    │
+    ▼
+build/distributions/*.zip
+    │
+    ▼
+share with testers
+```
+
+------------------------------------------------------------------------
+
+# Installation
+
+## Install from ZIP
+
+1.  Open **IntelliJ IDEA**.
+2.  Open **Settings / Preferences**.
+3.  Go to **Plugins**.
+4.  Click the **⚙️** menu.
+5.  Select **Install Plugin from Disk...**.
+6.  Select the generated ZIP from `build/distributions`.
+7.  Confirm installation.
+8.  Restart IntelliJ IDEA if requested.
+
+Select the ZIP directly --- it does not need to be extracted.
+
+------------------------------------------------------------------------
+
+# Usage
+
+## Tool Window
+
+Open **View → Tool Windows → SSM Diagram**, or use the **SSM Diagram**
+Tool Window button on the side of IntelliJ IDEA.
+
+The plugin searches for available configurations and populates the
+selector. Select a configuration and press **Generate**.
+
+## Refresh
+
+After changing the Java StateMachine configuration, press **Refresh**.
+The configuration currently displayed will be analyzed again.
+
+## Clear
+
+Press **Clear** to remove the current diagram while preserving
+configuration selection.
+
+## Generate from a Java file
+
+1.  Find the StateMachine Java configuration in the project tree.
+2.  Right-click the file.
+3.  Select **Generate SSM Diagram**.
+4.  The Tool Window opens and displays the generated diagram.
+
+------------------------------------------------------------------------
+
+# Diagram semantics
+
+The plugin deliberately distinguishes several layers:
+
+``` text
+Spring semantics
+      │
+      ▼
+StateMachineModel
+      │
+      ▼
+Canonical DiagramGraph
+      │
+      ▼
+Visual DiagramGraph
+      │
+      ▼
+Rendered diagram
+```
+
+This separation allows visualization to improve without changing the
+meaning of the StateMachine.
+
+------------------------------------------------------------------------
+
+# Design principles
+
+### Keep Spring semantics intact
+
+Visualization must never modify the semantic meaning extracted from
+source configuration.
+
+### PSI instead of source-text parsing
+
+Java configuration should be understood through IntelliJ's program model
+rather than formatting-dependent regular expressions.
+
+### Renderer only renders
+
+Parsing, semantic analysis, graph transformation and layout belong
+outside the renderer.
+
+### Visual readability over literal geometry
+
+A diagram should explain the StateMachine rather than simply reproduce
+every connection in the most literal possible geometry.
+
+### Stay inside IntelliJ IDEA
+
+The main workflow should not require copying generated definitions to
+external diagram websites or running a separate visualization service.
+
+------------------------------------------------------------------------
+
+# Known limitations
+
+The plugin is under active development.
+
+Spring Statemachine configurations can be written in many different
+styles. The analyzer currently focuses on Java configurations that can
+be resolved statically through IntelliJ PSI and expression patterns
+supported by the analyzer.
+
+Highly dynamic configuration may require additional analyzer support.
+
+The current layout engine prioritizes readability and may continue to
+evolve for especially large, dense or cyclic graphs.
+
+------------------------------------------------------------------------
+
+# Possible future improvements
+
+Potential directions include:
+
+-   richer details popup for states and transitions;
+-   displaying error actions in transition details;
+-   additional source navigation;
+-   improved handling of very large graphs;
+-   further layout optimization;
+-   improved cyclic/back-edge visualization;
+-   diagram search;
+-   highlighting related transitions;
+-   diagram export;
+-   support for additional Spring Statemachine configuration patterns.
+
+------------------------------------------------------------------------
+
+# Development notes
+
+When extending the plugin, preserve the boundary between semantic and
+visual models:
+
+``` text
+Java / PSI
+    │
+    ▼
+Analyzer
+    │
+    ▼
+StateMachineModel      ← Spring semantics
+    │
+    ▼
+DiagramGraphBuilder
+    │
+    ▼
+DiagramGraph           ← visual semantics
+    │
+    ▼
+Layout / Router
+    │
+    ▼
+Renderer
+```
+
+If a feature changes only how something looks, it should normally be
+implemented **after** `StateMachineModel`.
+
+If a feature changes what is understood from Spring configuration, it
+belongs in the analyzer/model layer.
+
+------------------------------------------------------------------------
+
+# Contributing
+
+Contributions, bug reports and ideas are welcome.
+
+For parsing or visualization issues, useful information includes:
+
+-   IntelliJ IDEA version;
+-   plugin version;
+-   a minimal Spring Statemachine configuration reproducing the issue;
+-   expected behavior;
+-   actual behavior;
+-   relevant IDE log output if an exception occurs.
+
+------------------------------------------------------------------------
+
+# License
+
+Add the project's license information here before public distribution.
+
+If the project uses a standard license such as MIT or Apache 2.0, add
+the corresponding `LICENSE` file and update this section.
+
+------------------------------------------------------------------------
+
+## Project status
+
+The plugin is currently in active development and testing.
+
+The current focus is reliable Spring Statemachine analysis, readable
+visualization, IntelliJ-native navigation and responsive background
+processing.
