@@ -4,6 +4,9 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramEdge
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import java.awt.Point
 
+/**
+ * Routes diagram edges as readable orthogonal polylines between laid-out nodes.
+ */
 class OrthogonalEdgeRouter {
 
     companion object {
@@ -75,6 +78,7 @@ class OrthogonalEdgeRouter {
         }
     }
 
+    /** Calculates orthogonal geometry for all graph edges. */
     fun route(
         graph: DiagramGraph,
         nodes: Map<String, NodeLayout>

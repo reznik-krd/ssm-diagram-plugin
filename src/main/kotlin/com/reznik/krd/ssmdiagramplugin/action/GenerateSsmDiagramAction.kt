@@ -7,46 +7,106 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.PsiManager
-import com.reznik.krd.ssmdiagramplugin.analyzer.SsmPsiAnalyzer
+import com.reznik.krd.ssmdiagramplugin.service.SsmBackgroundTaskService
 import com.reznik.krd.ssmdiagramplugin.ui.SsmDiagramService
 
+/**
+ * Generates an SSM diagram for the Java configuration selected in the project view.
+ *
+ * PSI analysis is performed asynchronously outside the EDT.
+ */
 class GenerateSsmDiagramAction : AnAction() {
 
-    private val analyzer = SsmPsiAnalyzer()
+    override fun actionPerformed(
+        event: AnActionEvent
+    ) {
 
-    override fun actionPerformed(event: AnActionEvent) {
-        val project = event.project ?: return
+        val project =
+            event.project
+                ?: return
 
-        val virtualFile = event.getData(CommonDataKeys.VIRTUAL_FILE)
-            ?: return
+        val virtualFile =
+            event.getData(
+                CommonDataKeys.VIRTUAL_FILE
+            )
+                ?: return
 
-        val psiFile = PsiManager
-            .getInstance(project)
-            .findFile(virtualFile)
+        val psiFile =
+            PsiManager
+                .getInstance(project)
+                .findFile(virtualFile)
 
         if (psiFile !is PsiJavaFile) {
+
             Messages.showWarningDialog(
                 project,
                 "Selected file is not a Java file.",
-                "Spring StateMachine Diagram"
+                DIALOG_TITLE
             )
+
             return
         }
 
-        val model = analyzer.analyze(psiFile)
+        /*
+         * Show the Tool Window immediately.
+         * The diagram itself will appear when background analysis completes.
+         */
+        ToolWindowManager
+            .getInstance(project)
+            .getToolWindow(TOOL_WINDOW_ID)
+            ?.show()
 
-        if (model == null) {
-            Messages.showWarningDialog(
-                project,
-                "Spring StateMachine configuration was not found.",
-                "Spring StateMachine Diagram"
-            )
-            return
-        }
+        val backgroundTaskService =
+            SsmBackgroundTaskService(project)
 
-        val diagramService = SsmDiagramService.getInstance(project)
-        diagramService.show(model)
-        val toolWindow = ToolWindowManager.getInstance(project).getToolWindow("SSM Diagram")
-        toolWindow?.show()
+        backgroundTaskService.analyze(
+            psiFile = psiFile,
+            onSuccess = { model ->
+
+                if (model == null) {
+
+                    Messages.showWarningDialog(
+                        project,
+                        "Spring StateMachine configuration was not found.",
+                        DIALOG_TITLE
+                    )
+
+                    return@analyze
+                }
+
+                SsmDiagramService
+                    .getInstance(project)
+                    .show(model)
+            },
+            onError = { error ->
+
+                Messages.showErrorDialog(
+                    project,
+                    buildString {
+
+                        append(
+                            "Failed to generate StateMachine diagram."
+                        )
+
+                        error.message
+                            ?.takeIf { it.isNotBlank() }
+                            ?.let {
+                                append("\n\n")
+                                append(it)
+                            }
+                    },
+                    DIALOG_TITLE
+                )
+            }
+        )
+    }
+
+    private companion object {
+
+        const val TOOL_WINDOW_ID =
+            "SSM Diagram"
+
+        const val DIALOG_TITLE =
+            "Spring StateMachine Diagram"
     }
 }

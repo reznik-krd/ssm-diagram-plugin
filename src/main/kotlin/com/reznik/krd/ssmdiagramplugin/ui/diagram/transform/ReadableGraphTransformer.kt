@@ -4,6 +4,9 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramEdge
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 
+/**
+ * Introduces visual state copies when doing so reduces high fan-in diagram clutter.
+ */
 class ReadableGraphTransformer {
 
     companion object {
@@ -17,6 +20,7 @@ class ReadableGraphTransformer {
         private const val MIN_DISTINCT_SOURCES_FOR_DUPLICATION = 3
     }
 
+    /** Produces a display-oriented graph while preserving logical state identity. */
     fun transform(
         graph: DiagramGraph
     ): DiagramGraph {

@@ -5,6 +5,9 @@ import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 
+/**
+ * Creates the persistent SSM Diagram tool window content.
+ */
 class SsmDiagramToolWindowFactory : ToolWindowFactory {
 
     override fun shouldBeAvailable(

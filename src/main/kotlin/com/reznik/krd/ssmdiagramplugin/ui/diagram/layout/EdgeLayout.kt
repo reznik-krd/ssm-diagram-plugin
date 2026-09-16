@@ -2,6 +2,9 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 
 import java.awt.Point
 
+/**
+ * Polyline and label positions calculated for one diagram edge.
+ */
 data class EdgeLayout(
     val points: List<Point>,
 

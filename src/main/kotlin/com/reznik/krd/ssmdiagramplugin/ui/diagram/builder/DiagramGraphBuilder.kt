@@ -6,6 +6,9 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramEdge
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 
+/**
+ * Converts the semantic StateMachineModel into the canonical visual graph.
+ */
 class DiagramGraphBuilder {
 
     companion object {
@@ -13,6 +16,7 @@ class DiagramGraphBuilder {
         private const val END_NODE_PREFIX = "__END__"
     }
 
+    /** Builds the canonical visual graph from the semantic model. */
     fun build(model: StateMachineModel): DiagramGraph {
 
         val nodes = mutableListOf<DiagramNode>()

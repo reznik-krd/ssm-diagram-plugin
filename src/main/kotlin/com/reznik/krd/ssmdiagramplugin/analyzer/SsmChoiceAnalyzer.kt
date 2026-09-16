@@ -3,19 +3,24 @@ package com.reznik.krd.ssmdiagramplugin.analyzer
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiExpression
 import com.intellij.psi.PsiMethodCallExpression
-import com.intellij.psi.PsiReferenceExpression
 import com.intellij.psi.util.PsiTreeUtil
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ComponentReferenceResolver
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ExpressionResolver
+import com.reznik.krd.ssmdiagramplugin.analyzer.psi.collectFluentChain
+import com.reznik.krd.ssmdiagramplugin.analyzer.psi.findCall
 import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 import com.reznik.krd.ssmdiagramplugin.model.SsmChoice
 import com.reznik.krd.ssmdiagramplugin.model.SsmChoiceBranch
 
+/**
+ * Extracts Spring StateMachine choice branches, guards and actions from Java PSI.
+ */
 class SsmChoiceAnalyzer {
 
     private val expressionResolver = ExpressionResolver()
     private val componentResolver = ComponentReferenceResolver()
 
+    /** Extracts all choice pseudo-states declared in the configuration class. */
     fun analyze(configClass: PsiClass): List<SsmChoice> {
         val result = mutableListOf<SsmChoice>()
 
@@ -39,7 +44,7 @@ class SsmChoiceAnalyzer {
         withChoice: PsiMethodCallExpression
     ): SsmChoice? {
 
-        val chain = collectChain(withChoice)
+        val chain = collectFluentChain(withChoice)
 
         val sourceCall =
             chain.findCall("source") ?: return null
@@ -203,55 +208,4 @@ class SsmChoiceAnalyzer {
         )
     }
 
-    private fun collectChain(
-        start: PsiMethodCallExpression
-    ): List<PsiMethodCallExpression> {
-
-        val result =
-            mutableListOf<PsiMethodCallExpression>()
-
-        var current:
-                PsiMethodCallExpression? =
-            start
-
-        while (current != null) {
-
-            val methodName =
-                current
-                    .methodExpression
-                    .referenceName
-
-            /*
-             * .and() завершает текущий fluent-блок.
-             *
-             * Всё после него уже относится
-             * к следующей конфигурации.
-             */
-            if (methodName == "and") {
-                break
-            }
-
-            result += current
-
-            val parentReference =
-                current.parent
-                        as? PsiReferenceExpression
-                    ?: break
-
-            current =
-                parentReference.parent
-                        as? PsiMethodCallExpression
-        }
-
-        return result
-    }
-
-    private fun List<PsiMethodCallExpression>.findCall(
-        name: String
-    ): PsiMethodCallExpression? {
-
-        return firstOrNull {
-            it.methodExpression.referenceName == name
-        }
-    }
 }
