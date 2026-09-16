@@ -12,27 +12,36 @@ import com.reznik.krd.ssmdiagramplugin.model.SsmTransition
 
 class SsmTransitionAnalyzer {
 
-    private val expressionResolver = ExpressionResolver()
-    private val componentResolver = ComponentReferenceResolver()
+    private val expressionResolver =
+        ExpressionResolver()
 
-    fun analyze(configClass: PsiClass): List<SsmTransition> {
+    private val componentResolver =
+        ComponentReferenceResolver()
 
-        val transitions = mutableListOf<SsmTransition>()
+    fun analyze(
+        configClass: PsiClass
+    ): List<SsmTransition> {
 
-        val calls = PsiTreeUtil.findChildrenOfType(
-            configClass,
-            PsiMethodCallExpression::class.java
-        )
+        val transitions =
+            mutableListOf<SsmTransition>()
+
+        val calls =
+            PsiTreeUtil.findChildrenOfType(
+                configClass,
+                PsiMethodCallExpression::class.java
+            )
 
         calls
             .filter {
-                it.methodExpression.referenceName == "withExternal"
+                it.methodExpression.referenceName ==
+                        "withExternal"
             }
             .forEach { withExternal ->
 
-                transitions += parseExternalTransition(
-                    withExternal
-                )
+                transitions +=
+                    parseExternalTransition(
+                        withExternal
+                    )
             }
 
         return transitions
@@ -42,43 +51,94 @@ class SsmTransitionAnalyzer {
         withExternal: PsiMethodCallExpression
     ): List<SsmTransition> {
 
-        val chain = collectChain(withExternal)
+        /*
+         * Собираем ТОЛЬКО текущий transition.
+         *
+         * Например:
+         *
+         * withExternal()
+         *   .source(...)
+         *   .target(...)
+         *   .event(...)
+         *   .guard(...)
+         *   .action(...)
+         *
+         * Как только встречаем .and(),
+         * текущий transition закончился.
+         */
+        val chain =
+            collectTransitionChain(
+                withExternal
+            )
 
         val sourceCall =
-            chain.findCall("source") ?: return emptyList()
+            chain.findCall("source")
+                ?: return emptyList()
 
         val targetCall =
-            chain.findCall("target") ?: return emptyList()
+            chain.findCall("target")
+                ?: return emptyList()
 
         val sourceExpression =
-            sourceCall.argumentList.expressions.firstOrNull()
+            sourceCall
+                .argumentList
+                .expressions
+                .firstOrNull()
                 ?: return emptyList()
 
         val targetExpression =
-            targetCall.argumentList.expressions.firstOrNull()
+            targetCall
+                .argumentList
+                .expressions
+                .firstOrNull()
                 ?: return emptyList()
 
-        val sources = resolve(sourceExpression)
-        val targets = resolve(targetExpression)
+        val sources =
+            resolve(
+                sourceExpression
+            )
 
-        if (sources.isEmpty() || targets.isEmpty()) {
+        val targets =
+            resolve(
+                targetExpression
+            )
+
+        if (
+            sources.isEmpty() ||
+            targets.isEmpty()
+        ) {
             return emptyList()
         }
 
+        /*
+         * Event.
+         */
         val eventExpression =
-            chain.findCall("event")
+            chain
+                .findCall("event")
                 ?.argumentList
                 ?.expressions
                 ?.firstOrNull()
 
+        /*
+         * Guard.
+         *
+         * Теперь guard ищется только
+         * внутри текущего transition.
+         */
         val guardExpression =
-            chain.findCall("guard")
+            chain
+                .findCall("guard")
                 ?.argumentList
                 ?.expressions
                 ?.firstOrNull()
 
+        /*
+         * Action + errorAction.
+         */
         val actionExpressions =
-            chain.findCall("action")
+            chain
+                .findCall("action")
                 ?.argumentList
                 ?.expressions
                 .orEmpty()
@@ -89,29 +149,32 @@ class SsmTransitionAnalyzer {
         val errorActionExpression =
             actionExpressions.getOrNull(1)
 
-        val event = eventExpression?.let(::resolveSingleName)
+        val event =
+            eventExpression
+                ?.let(::resolveSingleName)
 
         val guard =
-            guardExpression?.let(componentResolver::resolve)
+            guardExpression
+                ?.let(componentResolver::resolve)
 
         val action =
-            actionExpression?.let(componentResolver::resolve)
+            actionExpression
+                ?.let(componentResolver::resolve)
 
         val errorAction =
-            errorActionExpression?.let(componentResolver::resolve)
+            errorActionExpression
+                ?.let(componentResolver::resolve)
 
         /*
          * Cartesian product.
          *
-         * Обычно source и target содержат по одному значению.
-         *
-         * Но source может быть:
+         * Например если source:
          *
          * [CREATED, CHECKING, READY]
          *
-         * Тогда создаём три реальных перехода.
+         * создаём отдельный transition
+         * для каждого source.
          */
-
         return sources.flatMap { source ->
 
             targets.map { target ->
@@ -137,7 +200,8 @@ class SsmTransitionAnalyzer {
         expression: PsiExpression
     ): List<ResolvedValue> {
 
-        return expressionResolver.resolve(expression)
+        return expressionResolver
+            .resolve(expression)
     }
 
     private fun resolveSingleName(
@@ -148,7 +212,9 @@ class SsmTransitionAnalyzer {
             .resolve(expression)
             .firstOrNull()
             ?.name
-            ?: resolveReferenceName(expression)
+            ?: resolveReferenceName(
+                expression
+            )
     }
 
     private fun resolveReferenceName(
@@ -165,21 +231,50 @@ class SsmTransitionAnalyzer {
         }
     }
 
-    private fun collectChain(
+    /**
+     * Собирает fluent-chain только одного
+     * withExternal transition.
+     *
+     * Важная граница:
+     *
+     * .and()
+     *
+     * Всё после .and() уже относится
+     * к следующей конфигурации.
+     */
+    private fun collectTransitionChain(
         start: PsiMethodCallExpression
     ): List<PsiMethodCallExpression> {
 
         val result =
             mutableListOf<PsiMethodCallExpression>()
 
-        var current: PsiMethodCallExpression? = start
+        var current:
+                PsiMethodCallExpression? =
+            start
 
         while (current != null) {
+
+            val methodName =
+                current
+                    .methodExpression
+                    .referenceName
+
+            /*
+             * .and() является разделителем
+             * между transition definitions.
+             *
+             * Сам .and() нам тоже не нужен.
+             */
+            if (methodName == "and") {
+                break
+            }
 
             result += current
 
             val parentReference =
-                current.parent as? PsiReferenceExpression
+                current.parent
+                        as? PsiReferenceExpression
                     ?: break
 
             current =
@@ -195,7 +290,8 @@ class SsmTransitionAnalyzer {
     ): PsiMethodCallExpression? {
 
         return firstOrNull {
-            it.methodExpression.referenceName == name
+            it.methodExpression.referenceName ==
+                    name
         }
     }
 }

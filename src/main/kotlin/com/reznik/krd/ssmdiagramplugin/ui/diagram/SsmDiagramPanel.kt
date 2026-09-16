@@ -1,10 +1,8 @@
 package com.reznik.krd.ssmdiagramplugin.ui
 
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
-import java.awt.Cursor
-import java.awt.event.MouseAdapter
-import java.awt.event.MouseEvent
 import com.intellij.ui.JBColor
 import com.reznik.krd.ssmdiagramplugin.model.StateMachineModel
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.builder.DiagramGraphBuilder
@@ -16,17 +14,22 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.transform.ReadableGraphTransformer
 import java.awt.BasicStroke
+import java.awt.Color
+import java.awt.Cursor
+import java.awt.Dimension
 import java.awt.Font
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.Point
+import java.awt.Rectangle
 import java.awt.RenderingHints
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
+import java.awt.event.MouseMotionAdapter
 import javax.swing.JPanel
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
-import com.intellij.openapi.project.Project
-import java.awt.event.MouseMotionAdapter
 
 class SsmDiagramPanel(
     private val project: Project
@@ -40,26 +43,47 @@ class SsmDiagramPanel(
 
     private val layoutEngine =
         HierarchicalLayoutEngine()
+
+    /*
+     * Hover.
+     */
     private var hoveredNodeId: String? = null
+    private var hoveredGuardEdgeId: String? = null
+
+    /*
+     * Реальные области отрисованных guard labels.
+     *
+     * key   = edge.id
+     * value = Rectangle label
+     */
+    private val guardHitAreas =
+        mutableMapOf<String, Rectangle>()
 
     private var graph: DiagramGraph? = null
-
     private var layout: DiagramLayout? = null
 
+    /*
+     * Zoom.
+     */
     private var zoom = 1.0
+
     private val minZoom = 0.25
     private val maxZoom = 2.5
     private val zoomStep = 0.10
 
     init {
-        background = JBColor.PanelBackground
 
+        background =
+            JBColor.PanelBackground
+
+        /*
+         * Zoom:
+         *
+         * macOS         -> Cmd + wheel
+         * Windows/Linux -> Ctrl + wheel
+         */
         addMouseWheelListener { event ->
 
-            /*
-             * macOS -> Meta (Cmd)
-             * Windows/Linux -> Ctrl
-             */
             val zoomRequested =
                 event.isControlDown ||
                         event.isMetaDown
@@ -77,6 +101,9 @@ class SsmDiagramPanel(
             }
         }
 
+        /*
+         * Click.
+         */
         addMouseListener(
             object : MouseAdapter() {
 
@@ -94,6 +121,9 @@ class SsmDiagramPanel(
             }
         )
 
+        /*
+         * Hover.
+         */
         addMouseMotionListener(
             object : MouseMotionAdapter() {
 
@@ -106,23 +136,71 @@ class SsmDiagramPanel(
         )
     }
 
+    // -------------------------------------------------------------------------
+    // Mouse
+    // -------------------------------------------------------------------------
+
     private fun handleMouseMove(
         event: MouseEvent
     ) {
 
+        /*
+         * Сначала проверяем guard.
+         *
+         * Он имеет приоритет перед node.
+         */
+        val guardEdge =
+            findGuardEdgeAt(
+                mouseX = event.x,
+                mouseY = event.y
+            )
+
+        /*
+         * Hover показываем только если
+         * guard реально ведёт на PSI class.
+         *
+         * Например "otherwise" не кликабелен.
+         */
+        val clickableGuard =
+            guardEdge?.takeIf {
+                it.guard?.targetClass != null
+            }
+
+        if (clickableGuard != null) {
+
+            val changed =
+                hoveredGuardEdgeId != clickableGuard.id ||
+                        hoveredNodeId != null
+
+            hoveredGuardEdgeId =
+                clickableGuard.id
+
+            hoveredNodeId =
+                null
+
+            cursor =
+                Cursor.getPredefinedCursor(
+                    Cursor.HAND_CURSOR
+                )
+
+            if (changed) {
+                repaint()
+            }
+
+            return
+        }
+
+        /*
+         * Guard не найден.
+         *
+         * Проверяем state.
+         */
         val node =
             findNodeAt(
                 mouseX = event.x,
                 mouseY = event.y
             )
 
-        /*
-         * INITIAL / END технически тоже являются nodes,
-         * но кликать по ним сейчас некуда.
-         *
-         * Поэтому hover показываем только для state,
-         * у которого действительно есть source.
-         */
         val clickableNode =
             node?.takeIf {
                 it.state?.source != null
@@ -131,17 +209,15 @@ class SsmDiagramPanel(
         val newHoveredNodeId =
             clickableNode?.id
 
-        /*
-         * repaint нужен только если hover
-         * реально изменился.
-         */
-        if (hoveredNodeId != newHoveredNodeId) {
+        val changed =
+            hoveredNodeId != newHoveredNodeId ||
+                    hoveredGuardEdgeId != null
 
-            hoveredNodeId =
-                newHoveredNodeId
+        hoveredGuardEdgeId =
+            null
 
-            repaint()
-        }
+        hoveredNodeId =
+            newHoveredNodeId
 
         cursor =
             if (clickableNode != null) {
@@ -151,20 +227,27 @@ class SsmDiagramPanel(
             } else {
                 Cursor.getDefaultCursor()
             }
+
+        if (changed) {
+            repaint()
+        }
     }
 
     private fun clearHover() {
 
-        if (hoveredNodeId == null) {
-            return
-        }
+        val changed =
+            hoveredNodeId != null ||
+                    hoveredGuardEdgeId != null
 
         hoveredNodeId = null
+        hoveredGuardEdgeId = null
 
         cursor =
             Cursor.getDefaultCursor()
 
-        repaint()
+        if (changed) {
+            repaint()
+        }
     }
 
     private fun handleMouseClick(
@@ -172,12 +255,38 @@ class SsmDiagramPanel(
     ) {
 
         /*
-         * Нас интересует только левая кнопка.
+         * Только левая кнопка.
          */
         if (event.button != MouseEvent.BUTTON1) {
             return
         }
 
+        /*
+         * Сначала guard.
+         */
+        val guardEdge =
+            findGuardEdgeAt(
+                mouseX = event.x,
+                mouseY = event.y
+            )
+
+        val guardClass =
+            guardEdge
+                ?.guard
+                ?.targetClass
+
+        if (guardClass != null) {
+
+            navigateToPsiElement(
+                guardClass
+            )
+
+            return
+        }
+
+        /*
+         * Потом state.
+         */
         val node =
             findNodeAt(
                 mouseX = event.x,
@@ -186,6 +295,10 @@ class SsmDiagramPanel(
 
         navigateToNode(node)
     }
+
+    // -------------------------------------------------------------------------
+    // Hit testing
+    // -------------------------------------------------------------------------
 
     private fun findNodeAt(
         mouseX: Int,
@@ -199,8 +312,12 @@ class SsmDiagramPanel(
             this.layout ?: return null
 
         /*
-         * Переводим экранные координаты
-         * обратно в координаты DiagramLayout.
+         * Координаты MouseEvent находятся
+         * в screen-space.
+         *
+         * Layout находится в diagram-space.
+         *
+         * Поэтому учитываем zoom.
          */
         val diagramX =
             (mouseX / zoom).toInt()
@@ -221,6 +338,47 @@ class SsmDiagramPanel(
         }
     }
 
+    private fun findGuardEdgeAt(
+        mouseX: Int,
+        mouseY: Int
+    ): DiagramEdge? {
+
+        val graph =
+            this.graph ?: return null
+
+        /*
+         * Возвращаем координаты мыши
+         * обратно в diagram-space.
+         */
+        val diagramX =
+            (mouseX / zoom).toInt()
+
+        val diagramY =
+            (mouseY / zoom).toInt()
+
+        val edgeId =
+            guardHitAreas
+                .entries
+                .firstOrNull { (_, bounds) ->
+
+                    bounds.contains(
+                        diagramX,
+                        diagramY
+                    )
+                }
+                ?.key
+                ?: return null
+
+        return graph.edges
+            .firstOrNull {
+                it.id == edgeId
+            }
+    }
+
+    // -------------------------------------------------------------------------
+    // Navigation
+    // -------------------------------------------------------------------------
+
     private fun navigateToNode(
         node: DiagramNode
     ) {
@@ -229,7 +387,9 @@ class SsmDiagramPanel(
             node.state?.source
                 ?: return
 
-        navigateToPsiElement(source)
+        navigateToPsiElement(
+            source
+        )
     }
 
     private fun navigateToPsiElement(
@@ -248,13 +408,19 @@ class SsmDiagramPanel(
         ).navigate(true)
     }
 
+    // -------------------------------------------------------------------------
+    // Zoom
+    // -------------------------------------------------------------------------
+
     private fun zoomIn() {
+
         setZoom(
             zoom + zoomStep
         )
     }
 
     private fun zoomOut() {
+
         setZoom(
             zoom - zoomStep
         )
@@ -263,6 +429,7 @@ class SsmDiagramPanel(
     private fun setZoom(
         value: Double
     ) {
+
         zoom =
             value.coerceIn(
                 minZoom,
@@ -281,11 +448,15 @@ class SsmDiagramPanel(
             this.layout ?: return
 
         preferredSize =
-            java.awt.Dimension(
+            Dimension(
                 (layout.size.width * zoom).toInt(),
                 (layout.size.height * zoom).toInt()
             )
     }
+
+    // -------------------------------------------------------------------------
+    // Model
+    // -------------------------------------------------------------------------
 
     fun setModel(
         model: StateMachineModel
@@ -321,11 +492,23 @@ class SsmDiagramPanel(
         this.layout =
             layout
 
+        /*
+         * Сбрасываем hover от предыдущей схемы.
+         */
+        hoveredNodeId = null
+        hoveredGuardEdgeId = null
+
+        guardHitAreas.clear()
+
         updatePreferredSize()
 
         revalidate()
         repaint()
     }
+
+    // -------------------------------------------------------------------------
+    // Paint
+    // -------------------------------------------------------------------------
 
     override fun paintComponent(
         graphics: Graphics
@@ -354,10 +537,20 @@ class SsmDiagramPanel(
                 RenderingHints.VALUE_TEXT_ANTIALIAS_ON
             )
 
+            /*
+             * Весь renderer работает
+             * в diagram-space.
+             */
             g2.scale(
                 zoom,
                 zoom
             )
+
+            /*
+             * Каждый paint заново создаёт
+             * реальные hit areas labels.
+             */
+            guardHitAreas.clear()
 
             /*
              * Сначала edges.
@@ -381,6 +574,10 @@ class SsmDiagramPanel(
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Edges
+    // -------------------------------------------------------------------------
+
     private fun drawEdges(
         g2: Graphics2D,
         graph: DiagramGraph,
@@ -401,7 +598,7 @@ class SsmDiagramPanel(
             }
 
             /*
-             * Рисуем polyline.
+             * Polyline.
              */
             g2.color =
                 JBColor.GRAY
@@ -419,8 +616,7 @@ class SsmDiagramPanel(
                 }
 
             /*
-             * Arrowhead рисуем только
-             * на последнем сегменте.
+             * Arrowhead.
              */
             val beforeEnd =
                 edgeLayout.points[
@@ -437,7 +633,7 @@ class SsmDiagramPanel(
             )
 
             /*
-             * Labels поверх линии.
+             * Labels.
              */
             drawEdgeLabels(
                 g2 = g2,
@@ -454,7 +650,7 @@ class SsmDiagramPanel(
     ) {
 
         /*
-         * Технические INITIAL/END edges
+         * Технические INITIAL/END
          * не подписываем.
          */
         if (
@@ -466,6 +662,9 @@ class SsmDiagramPanel(
 
         /*
          * Event.
+         *
+         * Пока event только отображаем.
+         * Интерактивность добавим следующим этапом.
          */
         edge.event?.let { event ->
 
@@ -483,16 +682,6 @@ class SsmDiagramPanel(
 
         /*
          * Guard.
-         *
-         * Для choice:
-         *
-         * first(..., guard)
-         * then(..., guard)
-         *
-         * показываем просто имя guard.
-         *
-         * Для last(...)
-         * показываем otherwise.
          */
         val guardText =
             when {
@@ -528,37 +717,41 @@ class SsmDiagramPanel(
                         g2 = g2,
                         text = text,
                         position = position,
-                        kind = LabelKind.GUARD
+                        kind = LabelKind.GUARD,
+                        edgeId = edge.id
                     )
                 }
         }
     }
 
     /**
-     * Рисуем подпись с собственным фоном.
+     * Label chip.
      *
-     * Это важно, потому что иначе:
+     * Одновременно:
      *
-     * -------------------------
-     *      SOME_LONG_EVENT
-     * -------------------------
-     *
-     * линия проходит прямо через текст.
+     * 1. рисует фон;
+     * 2. рисует текст;
+     * 3. для guard сохраняет Rectangle;
+     * 4. подсвечивает guard при hover.
      */
     private fun drawLabelChip(
         g2: Graphics2D,
         text: String,
         position: Point,
-        kind: LabelKind
+        kind: LabelKind,
+        edgeId: String? = null
     ) {
 
         val oldFont =
             g2.font
 
+        val oldStroke =
+            g2.stroke
+
         /*
          * Event немного заметнее.
          *
-         * Guard делаем чуть компактнее.
+         * Guard компактнее.
          */
         g2.font =
             when (kind) {
@@ -594,26 +787,64 @@ class SsmDiagramPanel(
                     paddingY * 2
 
         /*
-         * position.x считаем центром label.
+         * position.x — центр label.
          */
         val chipX =
             position.x -
                     chipWidth / 2
 
         /*
-         * position.y — baseline-ish anchor.
+         * position.y — baseline текста.
+         *
+         * Оставляем ту же систему координат,
+         * которая была у тебя до интерактивности,
+         * чтобы labels визуально не прыгнули.
          */
         val chipY =
             position.y -
                     metrics.ascent -
                     paddingY
 
+        val bounds =
+            Rectangle(
+                chipX,
+                chipY,
+                chipWidth,
+                chipHeight
+            )
+
         /*
-         * Сначала перекрываем проходящую
-         * под label линию.
+         * Запоминаем hit area guard.
+         *
+         * В том числе для otherwise.
+         * Но otherwise потом не считается clickable,
+         * потому что edge.guard == null.
+         */
+        if (
+            kind == LabelKind.GUARD &&
+            edgeId != null
+        ) {
+            guardHitAreas[edgeId] =
+                bounds
+        }
+
+        val hovered =
+            kind == LabelKind.GUARD &&
+                    edgeId != null &&
+                    edgeId == hoveredGuardEdgeId
+
+        /*
+         * Background.
          */
         g2.color =
-            JBColor.PanelBackground
+            if (hovered) {
+                JBColor(
+                    Color(225, 235, 250),
+                    Color(65, 75, 90)
+                )
+            } else {
+                JBColor.PanelBackground
+            }
 
         g2.fillRoundRect(
             chipX,
@@ -625,7 +856,28 @@ class SsmDiagramPanel(
         )
 
         /*
-         * Затем текст.
+         * При hover добавляем небольшую рамку.
+         */
+        if (hovered) {
+
+            g2.color =
+                JBColor.GRAY
+
+            g2.stroke =
+                BasicStroke(1f)
+
+            g2.drawRoundRect(
+                chipX,
+                chipY,
+                chipWidth,
+                chipHeight,
+                8,
+                8
+            )
+        }
+
+        /*
+         * Text.
          */
         g2.color =
             when (kind) {
@@ -634,7 +886,11 @@ class SsmDiagramPanel(
                     JBColor.foreground()
 
                 LabelKind.GUARD ->
-                    JBColor.GRAY
+                    if (hovered) {
+                        JBColor.foreground()
+                    } else {
+                        JBColor.GRAY
+                    }
             }
 
         g2.drawString(
@@ -643,9 +899,19 @@ class SsmDiagramPanel(
             position.y
         )
 
+        /*
+         * Возвращаем Graphics2D в исходное состояние.
+         */
         g2.font =
             oldFont
+
+        g2.stroke =
+            oldStroke
     }
+
+    // -------------------------------------------------------------------------
+    // Nodes
+    // -------------------------------------------------------------------------
 
     private fun drawNodes(
         g2: Graphics2D,
@@ -718,8 +984,8 @@ class SsmDiagramPanel(
         g2.color =
             if (hovered) {
                 JBColor(
-                    java.awt.Color(235, 242, 252),
-                    java.awt.Color(55, 65, 78)
+                    Color(235, 242, 252),
+                    Color(55, 65, 78)
                 )
             } else {
                 JBColor.PanelBackground
@@ -773,10 +1039,12 @@ class SsmDiagramPanel(
 
         val textX =
             position.x +
-                    (width -
-                            metrics.stringWidth(
-                                node.label
-                            )) / 2
+                    (
+                            width -
+                                    metrics.stringWidth(
+                                        node.label
+                                    )
+                            ) / 2
 
         val textY =
             position.y +
@@ -835,29 +1103,22 @@ class SsmDiagramPanel(
 
         val hovered =
             node.id == hoveredNodeId
+
         g2.color =
             if (hovered) {
                 JBColor(
-                    java.awt.Color(235, 242, 252),
-                    java.awt.Color(55, 65, 78)
+                    Color(235, 242, 252),
+                    Color(55, 65, 78)
                 )
             } else {
                 JBColor.PanelBackground
             }
-
-
 
         g2.fillPolygon(
             xPoints,
             yPoints,
             4
         )
-
-        g2.color =
-            JBColor.GRAY
-
-        g2.stroke =
-            BasicStroke(1.4f)
 
         g2.color =
             if (hovered) {
@@ -957,6 +1218,10 @@ class SsmDiagramPanel(
             innerRadius * 2
         )
     }
+
+    // -------------------------------------------------------------------------
+    // Arrow
+    // -------------------------------------------------------------------------
 
     private fun drawArrowHead(
         g2: Graphics2D,

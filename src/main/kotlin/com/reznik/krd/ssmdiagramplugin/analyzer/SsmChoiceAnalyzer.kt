@@ -146,13 +146,32 @@ class SsmChoiceAnalyzer {
         val result =
             mutableListOf<PsiMethodCallExpression>()
 
-        var current: PsiMethodCallExpression? = start
+        var current:
+                PsiMethodCallExpression? =
+            start
 
         while (current != null) {
+
+            val methodName =
+                current
+                    .methodExpression
+                    .referenceName
+
+            /*
+             * .and() завершает текущий fluent-блок.
+             *
+             * Всё после него уже относится
+             * к следующей конфигурации.
+             */
+            if (methodName == "and") {
+                break
+            }
+
             result += current
 
             val parentReference =
-                current.parent as? PsiReferenceExpression
+                current.parent
+                        as? PsiReferenceExpression
                     ?: break
 
             current =
