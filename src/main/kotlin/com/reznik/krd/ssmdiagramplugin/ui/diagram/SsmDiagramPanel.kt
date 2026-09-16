@@ -1,4 +1,4 @@
-package com.reznik.krd.ssmdiagramplugin.ui
+package com.reznik.krd.ssmdiagramplugin.ui.diagram;
 
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project
@@ -634,20 +634,77 @@ class SsmDiagramPanel(
     }
 
     // -------------------------------------------------------------------------
-    // Zoom
+    // Zoom / View
     // -------------------------------------------------------------------------
 
-    private fun zoomIn() {
+    private var zoomChangedListener: ((Double) -> Unit)? = null
+
+    fun setZoomChangedListener(
+        listener: (Double) -> Unit
+    ) {
+
+        zoomChangedListener = listener
+        listener(zoom)
+    }
+
+    fun zoomIn() {
 
         setZoom(
             zoom + zoomStep
         )
     }
 
-    private fun zoomOut() {
+    fun zoomOut() {
 
         setZoom(
             zoom - zoomStep
+        )
+    }
+
+    fun resetZoom() {
+
+        setZoom(1.0)
+    }
+
+    fun fitToViewport(
+        viewportSize: Dimension
+    ) {
+
+        val layout =
+            this.layout ?: return
+
+        if (
+            layout.size.width <= 0 ||
+            layout.size.height <= 0 ||
+            viewportSize.width <= 0 ||
+            viewportSize.height <= 0
+        ) {
+            return
+        }
+
+        val padding = 40
+
+        val availableWidth =
+            (viewportSize.width - padding)
+                .coerceAtLeast(1)
+
+        val availableHeight =
+            (viewportSize.height - padding)
+                .coerceAtLeast(1)
+
+        val widthZoom =
+            availableWidth.toDouble() /
+                    layout.size.width
+
+        val heightZoom =
+            availableHeight.toDouble() /
+                    layout.size.height
+
+        setZoom(
+            minOf(
+                widthZoom,
+                heightZoom
+            )
         )
     }
 
@@ -655,16 +712,24 @@ class SsmDiagramPanel(
         value: Double
     ) {
 
-        zoom =
+        val newZoom =
             value.coerceIn(
                 minZoom,
                 maxZoom
             )
 
+        if (zoom == newZoom) {
+            return
+        }
+
+        zoom = newZoom
+
         updatePreferredSize()
 
         revalidate()
         repaint()
+
+        zoomChangedListener?.invoke(zoom)
     }
 
     private fun updatePreferredSize() {
@@ -730,6 +795,36 @@ class SsmDiagramPanel(
         actionHitAreas.clear()
 
         updatePreferredSize()
+
+        revalidate()
+        repaint()
+    }
+
+    fun clear() {
+
+        graph = null
+        layout = null
+
+        hoveredNodeId = null
+        hoveredEventEdgeId = null
+        hoveredGuardEdgeId = null
+        hoveredAction = null
+
+        eventHitAreas.clear()
+        guardHitAreas.clear()
+        actionHitAreas.clear()
+
+        zoom = 1.0
+        zoomChangedListener?.invoke(zoom)
+
+        preferredSize =
+            Dimension(
+                0,
+                0
+            )
+
+        cursor =
+            Cursor.getDefaultCursor()
 
         revalidate()
         repaint()
