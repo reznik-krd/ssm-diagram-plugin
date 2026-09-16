@@ -3,8 +3,12 @@ package com.reznik.krd.ssmdiagramplugin.analyzer.expression
 import com.intellij.psi.*
 import com.reznik.krd.ssmdiagramplugin.model.SsmComponentReference
 
+/**
+ * Resolves action and guard PSI expressions to navigable component references.
+ */
 class ComponentReferenceResolver {
 
+    /** Resolves an action or guard expression into a navigable component reference. */
     fun resolve(expression: PsiExpression): SsmComponentReference {
 
         if (expression is PsiReferenceExpression) {

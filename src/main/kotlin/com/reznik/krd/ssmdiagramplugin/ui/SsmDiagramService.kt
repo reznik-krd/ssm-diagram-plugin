@@ -5,6 +5,9 @@ import com.intellij.openapi.project.Project
 import com.reznik.krd.ssmdiagramplugin.model.StateMachineModel
 
 @Service(Service.Level.PROJECT)
+/**
+ * Project-level bridge that publishes the currently generated diagram model to UI listeners.
+ */
 class SsmDiagramService {
 
     private var model: StateMachineModel? = null

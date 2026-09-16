@@ -2,6 +2,9 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.model
 
 import com.reznik.krd.ssmdiagramplugin.model.SsmState
 
+/**
+ * Visual node; logicalId links visual copies to the same semantic state.
+ */
 data class DiagramNode(
     val id: String,
     val logicalId: String,

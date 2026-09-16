@@ -2,6 +2,9 @@ package com.reznik.krd.ssmdiagramplugin.model
 
 import com.intellij.psi.PsiClass
 
+/**
+ * Metadata for a detected StateMachine configuration class.
+ */
 data class SsmConfigInfo(
     val configClass: PsiClass,
     val stateClass: PsiClass?,

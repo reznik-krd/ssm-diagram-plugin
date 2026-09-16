@@ -6,6 +6,9 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 import java.awt.Dimension
 import java.util.ArrayDeque
 
+/**
+ * Places diagram nodes in top-to-bottom hierarchy and delegates edge routing.
+ */
 class HierarchicalLayoutEngine {
 
     private val edgeRouter =
@@ -36,6 +39,7 @@ class HierarchicalLayoutEngine {
 
     private val margin = 100
 
+    /** Calculates node levels, coordinates and routed edges for the graph. */
     fun layout(
         graph: DiagramGraph
     ): DiagramLayout {

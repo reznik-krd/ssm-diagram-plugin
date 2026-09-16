@@ -2,6 +2,9 @@ package com.reznik.krd.ssmdiagramplugin.model
 
 import com.intellij.psi.PsiElement
 
+/**
+ * Semantic external transition between two state identifiers.
+ */
 data class SsmTransition(
     val source: String,
     val target: String,

@@ -3,8 +3,12 @@ package com.reznik.krd.ssmdiagramplugin.analyzer.expression
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 
+/**
+ * Resolves supported PSI expressions to semantic state or event values.
+ */
 class ExpressionResolver {
 
+    /** Resolves a supported PSI expression into one or more symbolic values. */
     fun resolve(expression: PsiExpression): List<ResolvedValue> {
         return when (expression) {
             is PsiReferenceExpression -> resolveReference(expression)

@@ -1,5 +1,8 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.model
 
+/**
+ * Visual graph consumed by layout and rendering stages.
+ */
 data class DiagramGraph(
     val nodes: List<DiagramNode>,
     val edges: List<DiagramEdge>

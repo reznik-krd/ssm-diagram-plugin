@@ -2,6 +2,9 @@ package com.reznik.krd.ssmdiagramplugin.model
 
 import com.intellij.psi.PsiElement
 
+/**
+ * Semantic representation of a Spring StateMachine choice pseudo-state.
+ */
 data class SsmChoice(
     val source: String,
     val branches: List<SsmChoiceBranch>,

@@ -4,6 +4,8 @@ import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiExpression
 import com.intellij.psi.PsiMethodCallExpression
 import com.intellij.psi.PsiReferenceExpression
+import com.reznik.krd.ssmdiagramplugin.analyzer.psi.collectFluentChain
+import com.reznik.krd.ssmdiagramplugin.analyzer.psi.findCall
 import com.intellij.psi.util.PsiTreeUtil
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ComponentReferenceResolver
 import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ExpressionResolver
@@ -11,6 +13,9 @@ import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ResolvedValue
 import com.reznik.krd.ssmdiagramplugin.model.SsmTransition
 import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 
+/**
+ * Extracts external transitions, events, guards and actions from a StateMachine configuration.
+ */
 class SsmTransitionAnalyzer {
 
     private val expressionResolver =
@@ -19,6 +24,7 @@ class SsmTransitionAnalyzer {
     private val componentResolver =
         ComponentReferenceResolver()
 
+    /** Extracts all external transitions declared by the configuration class. */
     fun analyze(
         configClass: PsiClass
     ): List<SsmTransition> {
@@ -68,7 +74,7 @@ class SsmTransitionAnalyzer {
          * текущий transition закончился.
          */
         val chain =
-            collectTransitionChain(
+            collectFluentChain(
                 withExternal
             )
 
@@ -255,67 +261,4 @@ class SsmTransitionAnalyzer {
         }
     }
 
-    /**
-     * Собирает fluent-chain только одного
-     * withExternal transition.
-     *
-     * Важная граница:
-     *
-     * .and()
-     *
-     * Всё после .and() уже относится
-     * к следующей конфигурации.
-     */
-    private fun collectTransitionChain(
-        start: PsiMethodCallExpression
-    ): List<PsiMethodCallExpression> {
-
-        val result =
-            mutableListOf<PsiMethodCallExpression>()
-
-        var current:
-                PsiMethodCallExpression? =
-            start
-
-        while (current != null) {
-
-            val methodName =
-                current
-                    .methodExpression
-                    .referenceName
-
-            /*
-             * .and() является разделителем
-             * между transition definitions.
-             *
-             * Сам .and() нам тоже не нужен.
-             */
-            if (methodName == "and") {
-                break
-            }
-
-            result += current
-
-            val parentReference =
-                current.parent
-                        as? PsiReferenceExpression
-                    ?: break
-
-            current =
-                parentReference.parent
-                        as? PsiMethodCallExpression
-        }
-
-        return result
-    }
-
-    private fun List<PsiMethodCallExpression>.findCall(
-        name: String
-    ): PsiMethodCallExpression? {
-
-        return firstOrNull {
-            it.methodExpression.referenceName ==
-                    name
-        }
-    }
 }

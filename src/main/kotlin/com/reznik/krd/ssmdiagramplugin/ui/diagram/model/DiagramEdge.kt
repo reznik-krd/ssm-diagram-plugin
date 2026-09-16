@@ -4,6 +4,9 @@ import com.intellij.psi.PsiElement
 import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 import com.reznik.krd.ssmdiagramplugin.model.SsmComponentReference
 
+/**
+ * Visual edge with transition semantics required by the renderer.
+ */
 data class DiagramEdge(
     val id: String,
 

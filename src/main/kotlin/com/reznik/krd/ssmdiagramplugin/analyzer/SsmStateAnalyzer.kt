@@ -4,8 +4,12 @@ import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 import com.reznik.krd.ssmdiagramplugin.model.SsmState
 
+/**
+ * Extracts declared initial, normal, choice and end states from a StateMachine configuration.
+ */
 class SsmStateAnalyzer {
 
+    /** Extracts all states declared by the configuration class. */
     fun analyze(configClass: PsiClass): List<SsmState> {
         val configureMethod = findStatesConfigureMethod(configClass)
             ?: return emptyList()

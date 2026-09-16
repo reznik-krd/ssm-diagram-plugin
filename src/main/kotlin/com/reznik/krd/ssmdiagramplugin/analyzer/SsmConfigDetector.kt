@@ -6,6 +6,9 @@ import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.util.InheritanceUtil
 import com.reznik.krd.ssmdiagramplugin.model.SsmConfigInfo
 
+/**
+ * Detects EnumStateMachineConfigurerAdapter configurations and resolves state/event types.
+ */
 class SsmConfigDetector {
 
     companion object {
@@ -13,6 +16,7 @@ class SsmConfigDetector {
             "org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter"
     }
 
+    /** Returns configuration metadata when the Java file contains a supported SSM config. */
     fun detect(file: PsiJavaFile): SsmConfigInfo? {
         for (psiClass in file.classes) {
             val result = detect(psiClass)
