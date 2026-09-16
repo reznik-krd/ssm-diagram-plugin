@@ -48,6 +48,7 @@ class SsmDiagramPanel(
      * Hover.
      */
     private var hoveredNodeId: String? = null
+    private var hoveredEventEdgeId: String? = null
     private var hoveredGuardEdgeId: String? = null
 
     /*
@@ -56,6 +57,9 @@ class SsmDiagramPanel(
      * key   = edge.id
      * value = Rectangle label
      */
+    private val eventHitAreas =
+        mutableMapOf<String, Rectangle>()
+
     private val guardHitAreas =
         mutableMapOf<String, Rectangle>()
 
@@ -145,9 +149,44 @@ class SsmDiagramPanel(
     ) {
 
         /*
-         * Сначала проверяем guard.
-         *
-         * Он имеет приоритет перед node.
+         * Сначала проверяем event.
+         */
+        val eventEdge =
+            findEventEdgeAt(
+                mouseX = event.x,
+                mouseY = event.y
+            )
+
+        val clickableEvent =
+            eventEdge?.takeIf {
+                it.eventElement != null
+            }
+
+        if (clickableEvent != null) {
+
+            val changed =
+                hoveredEventEdgeId != clickableEvent.id ||
+                        hoveredGuardEdgeId != null ||
+                        hoveredNodeId != null
+
+            hoveredEventEdgeId = clickableEvent.id
+            hoveredGuardEdgeId = null
+            hoveredNodeId = null
+
+            cursor =
+                Cursor.getPredefinedCursor(
+                    Cursor.HAND_CURSOR
+                )
+
+            if (changed) {
+                repaint()
+            }
+
+            return
+        }
+
+        /*
+         * Затем проверяем guard.
          */
         val guardEdge =
             findGuardEdgeAt(
@@ -170,8 +209,10 @@ class SsmDiagramPanel(
 
             val changed =
                 hoveredGuardEdgeId != clickableGuard.id ||
+                        hoveredEventEdgeId != null ||
                         hoveredNodeId != null
 
+            hoveredEventEdgeId = null
             hoveredGuardEdgeId =
                 clickableGuard.id
 
@@ -211,8 +252,10 @@ class SsmDiagramPanel(
 
         val changed =
             hoveredNodeId != newHoveredNodeId ||
+                    hoveredEventEdgeId != null ||
                     hoveredGuardEdgeId != null
 
+        hoveredEventEdgeId = null
         hoveredGuardEdgeId =
             null
 
@@ -237,9 +280,11 @@ class SsmDiagramPanel(
 
         val changed =
             hoveredNodeId != null ||
+                    hoveredEventEdgeId != null ||
                     hoveredGuardEdgeId != null
 
         hoveredNodeId = null
+        hoveredEventEdgeId = null
         hoveredGuardEdgeId = null
 
         cursor =
@@ -262,7 +307,28 @@ class SsmDiagramPanel(
         }
 
         /*
-         * Сначала guard.
+         * Сначала event.
+         */
+        val eventEdge =
+            findEventEdgeAt(
+                mouseX = event.x,
+                mouseY = event.y
+            )
+
+        val eventElement =
+            eventEdge?.eventElement
+
+        if (eventElement != null) {
+
+            navigateToPsiElement(
+                eventElement
+            )
+
+            return
+        }
+
+        /*
+         * Затем guard.
          */
         val guardEdge =
             findGuardEdgeAt(
@@ -336,6 +402,38 @@ class SsmDiagramPanel(
                     diagramY >= nodeLayout.y &&
                     diagramY <= nodeLayout.y + nodeLayout.height
         }
+    }
+
+    private fun findEventEdgeAt(
+        mouseX: Int,
+        mouseY: Int
+    ): DiagramEdge? {
+
+        val graph =
+            this.graph ?: return null
+
+        val diagramX =
+            (mouseX / zoom).toInt()
+
+        val diagramY =
+            (mouseY / zoom).toInt()
+
+        val edgeId =
+            eventHitAreas
+                .entries
+                .firstOrNull { (_, bounds) ->
+                    bounds.contains(
+                        diagramX,
+                        diagramY
+                    )
+                }
+                ?.key
+                ?: return null
+
+        return graph.edges
+            .firstOrNull {
+                it.id == edgeId
+            }
     }
 
     private fun findGuardEdgeAt(
@@ -496,8 +594,10 @@ class SsmDiagramPanel(
          * Сбрасываем hover от предыдущей схемы.
          */
         hoveredNodeId = null
+        hoveredEventEdgeId = null
         hoveredGuardEdgeId = null
 
+        eventHitAreas.clear()
         guardHitAreas.clear()
 
         updatePreferredSize()
@@ -550,6 +650,7 @@ class SsmDiagramPanel(
              * Каждый paint заново создаёт
              * реальные hit areas labels.
              */
+            eventHitAreas.clear()
             guardHitAreas.clear()
 
             /*
@@ -675,7 +776,8 @@ class SsmDiagramPanel(
                         g2 = g2,
                         text = event,
                         position = position,
-                        kind = LabelKind.EVENT
+                        kind = LabelKind.EVENT,
+                        edgeId = edge.id
                     )
                 }
         }
@@ -820,18 +922,26 @@ class SsmDiagramPanel(
          * Но otherwise потом не считается clickable,
          * потому что edge.guard == null.
          */
-        if (
-            kind == LabelKind.GUARD &&
-            edgeId != null
-        ) {
-            guardHitAreas[edgeId] =
-                bounds
+        if (edgeId != null) {
+            when (kind) {
+                LabelKind.EVENT ->
+                    eventHitAreas[edgeId] = bounds
+
+                LabelKind.GUARD ->
+                    guardHitAreas[edgeId] = bounds
+            }
         }
 
         val hovered =
-            kind == LabelKind.GUARD &&
+            when (kind) {
+                LabelKind.EVENT ->
                     edgeId != null &&
-                    edgeId == hoveredGuardEdgeId
+                            edgeId == hoveredEventEdgeId
+
+                LabelKind.GUARD ->
+                    edgeId != null &&
+                            edgeId == hoveredGuardEdgeId
+            }
 
         /*
          * Background.

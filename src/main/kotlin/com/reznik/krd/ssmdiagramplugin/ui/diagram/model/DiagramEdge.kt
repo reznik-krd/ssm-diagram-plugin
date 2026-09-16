@@ -1,5 +1,6 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.model
 
+import com.intellij.psi.PsiElement
 import com.reznik.krd.ssmdiagramplugin.model.SsmComponentReference
 
 data class DiagramEdge(
@@ -10,6 +11,7 @@ data class DiagramEdge(
     val type: Type,
 
     val event: String? = null,
+    val eventElement: PsiElement? = null,
     val guard: SsmComponentReference? = null,
     val action: SsmComponentReference? = null,
     val errorAction: SsmComponentReference? = null

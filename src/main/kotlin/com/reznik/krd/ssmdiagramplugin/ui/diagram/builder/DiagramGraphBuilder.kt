@@ -51,6 +51,7 @@ class DiagramGraphBuilder {
                 type = DiagramEdge.Type.TRANSITION,
 
                 event = transition.event,
+                eventElement = transition.eventElement,
                 guard = transition.guard,
                 action = transition.action,
                 errorAction = transition.errorAction

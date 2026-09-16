@@ -191,6 +191,7 @@ class SsmTransitionAnalyzer {
                     sourceElement = source.source,
                     targetElement = target.source,
                     eventElement = eventExpression
+                        ?.let { expressionResolver.resolve(it).firstOrNull()?.source ?: it }
                 )
             }
         }
