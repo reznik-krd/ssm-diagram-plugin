@@ -20,15 +20,29 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Renders transition lines, labels, arrows and action chips. */
+/**
+ * Renders transition lines, labels, arrows and action chips.
+ */
 internal class EdgeRenderer(
     private val interaction: DiagramInteractionState,
     private val hitRegistry: DiagramHitRegistry
 ) {
 
-    fun render(g2: Graphics2D, graph: DiagramGraph, layout: DiagramLayout) {
-        drawEdges(g2, graph, layout)
+    fun render(
+        g2: Graphics2D,
+        graph: DiagramGraph,
+        layout: DiagramLayout
+    ) {
+        drawEdges(
+            g2,
+            graph,
+            layout
+        )
     }
+
+    // -------------------------------------------------------------------------
+    // Edges
+    // -------------------------------------------------------------------------
 
     private fun drawEdges(
         g2: Graphics2D,
@@ -36,74 +50,157 @@ internal class EdgeRenderer(
         layout: DiagramLayout
     ) {
 
-        g2.stroke =
-            BasicStroke(1.4f)
+        /*
+         * Сначала рисуем обычные edges.
+         *
+         * Выбранный edge рисуем последним,
+         * чтобы он оказался поверх остальных линий.
+         */
+        val selectedEdgeId =
+            interaction.selectedEdgeId
 
-        graph.edges.forEach { edge ->
-
-            val edgeLayout =
-                layout.edges[edge.id]
-                    ?: return@forEach
-
-            if (edgeLayout.points.size < 2) {
-                return@forEach
+        graph.edges
+            .filter { it.id != selectedEdgeId }
+            .forEach { edge ->
+                drawEdge(
+                    g2 = g2,
+                    edge = edge,
+                    layout = layout,
+                    selected = false
+                )
             }
 
-            /*
-             * Polyline.
-             */
-            g2.color =
-                JBColor.GRAY
+        /*
+         * Selected edge поверх остальных.
+         */
+        selectedEdgeId
+            ?.let { edgeId ->
 
-            edgeLayout.points
-                .zipWithNext()
-                .forEach { (start, end) ->
-
-                    g2.drawLine(
-                        start.x,
-                        start.y,
-                        end.x,
-                        end.y
-                    )
-                }
-
-            /*
-             * Arrowhead.
-             */
-            val beforeEnd =
-                edgeLayout.points[
-                    edgeLayout.points.size - 2
-                ]
-
-            val end =
-                edgeLayout.points.last()
-
-            drawArrowHead(
-                g2 = g2,
-                from = beforeEnd,
-                to = end
-            )
-
-            /*
-             * Labels.
-             */
-            drawEdgeLabels(
-                g2 = g2,
-                edge = edge,
-                edgeLayout = edgeLayout
-            )
-        }
+                graph.edges
+                    .firstOrNull {
+                        it.id == edgeId
+                    }
+                    ?.let { edge ->
+                        drawEdge(
+                            g2 = g2,
+                            edge = edge,
+                            layout = layout,
+                            selected = true
+                        )
+                    }
+            }
     }
+
+    private fun drawEdge(
+        g2: Graphics2D,
+        edge: DiagramEdge,
+        layout: DiagramLayout,
+        selected: Boolean
+    ) {
+
+        val edgeLayout =
+            layout.edges[edge.id]
+                ?: return
+
+        if (edgeLayout.points.size < 2) {
+            return
+        }
+
+        val oldStroke =
+            g2.stroke
+
+        val oldColor =
+            g2.color
+
+        /*
+         * Selected edge:
+         *
+         * - thicker
+         * - accent color
+         */
+        g2.stroke =
+            BasicStroke(
+                if (selected) {
+                    SELECTED_EDGE_WIDTH
+                } else {
+                    NORMAL_EDGE_WIDTH
+                },
+                BasicStroke.CAP_ROUND,
+                BasicStroke.JOIN_ROUND
+            )
+
+        g2.color =
+            if (selected) {
+                SELECTED_COLOR
+            } else {
+                JBColor.GRAY
+            }
+
+        /*
+         * Polyline.
+         */
+        edgeLayout.points
+            .zipWithNext()
+            .forEach { (start, end) ->
+
+                g2.drawLine(
+                    start.x,
+                    start.y,
+                    end.x,
+                    end.y
+                )
+            }
+
+        /*
+         * Arrowhead uses the same stroke/color,
+         * therefore selected arrow is highlighted too.
+         */
+        val beforeEnd =
+            edgeLayout.points[
+                edgeLayout.points.size - 2
+            ]
+
+        val end =
+            edgeLayout.points.last()
+
+        drawArrowHead(
+            g2 = g2,
+            from = beforeEnd,
+            to = end
+        )
+
+        /*
+         * Labels belonging to selected edge
+         * are highlighted as well.
+         */
+        drawEdgeLabels(
+            g2 = g2,
+            edge = edge,
+            edgeLayout = edgeLayout,
+            selected = selected
+        )
+
+        g2.stroke =
+            oldStroke
+
+        g2.color =
+            oldColor
+    }
+
+    // -------------------------------------------------------------------------
+    // Edge labels
+    // -------------------------------------------------------------------------
 
     private fun drawEdgeLabels(
         g2: Graphics2D,
         edge: DiagramEdge,
-        edgeLayout: EdgeLayout
+        edgeLayout: EdgeLayout,
+        selected: Boolean
     ) {
 
         /*
-         * Технические INITIAL/END
-         * не подписываем.
+         * Technical INITIAL / END edges
+         * do not have labels.
          */
         if (
             edge.type == DiagramEdge.Type.INITIAL ||
@@ -115,20 +212,22 @@ internal class EdgeRenderer(
         /*
          * Event.
          */
-        edge.event?.let { event ->
+        edge.event
+            ?.let { event ->
 
-            edgeLayout.eventLabelPosition
-                ?.let { position ->
+                edgeLayout.eventLabelPosition
+                    ?.let { position ->
 
-                    drawLabelChip(
-                        g2 = g2,
-                        text = event,
-                        position = position,
-                        kind = LabelKind.EVENT,
-                        edgeId = edge.id
-                    )
-                }
-        }
+                        drawLabelChip(
+                            g2 = g2,
+                            text = event,
+                            position = position,
+                            kind = LabelKind.EVENT,
+                            edgeId = edge.id,
+                            selected = selected
+                        )
+                    }
+            }
 
         /*
          * Guard.
@@ -158,51 +257,56 @@ internal class EdgeRenderer(
                     null
             }
 
-        guardText?.let { text ->
+        guardText
+            ?.let { text ->
 
-            edgeLayout.guardLabelPosition
-                ?.let { position ->
+                edgeLayout.guardLabelPosition
+                    ?.let { position ->
 
-                    drawLabelChip(
-                        g2 = g2,
-                        text = text,
-                        position = position,
-                        kind = LabelKind.GUARD,
-                        edgeId = edge.id
-                    )
-                }
-        }
+                        drawLabelChip(
+                            g2 = g2,
+                            text = text,
+                            position = position,
+                            kind = LabelKind.GUARD,
+                            edgeId = edge.id,
+                            selected = selected
+                        )
+                    }
+            }
 
         /*
          * Actions.
-         *
-         * Error actions намеренно
-         * не отображаем.
-         *
-         * Каждый action имеет собственный index,
-         * поэтому несколько actions одного edge
-         * остаются независимыми.
          */
         edge.actions
-            .zip(edgeLayout.actionLabelPositions)
-            .forEachIndexed { index, (ssmAction, position) ->
+            .zip(
+                edgeLayout.actionLabelPositions
+            )
+            .forEachIndexed {
+                    index,
+                    (ssmAction, position) ->
 
                 drawActionLabel(
                     g2 = g2,
                     edge = edge,
                     actionIndex = index,
                     action = ssmAction,
-                    position = position
+                    position = position,
+                    selected = selected
                 )
             }
     }
+
+    // -------------------------------------------------------------------------
+    // Actions
+    // -------------------------------------------------------------------------
 
     private fun drawActionLabel(
         g2: Graphics2D,
         edge: DiagramEdge,
         actionIndex: Int,
         action: SsmAction,
-        position: Point
+        position: Point,
+        selected: Boolean
     ) {
 
         val oldFont =
@@ -232,8 +336,11 @@ internal class EdgeRenderer(
         val textHeight =
             metrics.height
 
-        val horizontalPadding = 7
-        val verticalPadding = 3
+        val horizontalPadding =
+            7
+
+        val verticalPadding =
+            3
 
         val bounds =
             Rectangle(
@@ -253,8 +360,7 @@ internal class EdgeRenderer(
             )
 
         /*
-         * Запоминаем реальную область именно
-         * этого конкретного action.
+         * Hit area of this exact action.
          */
         hitRegistry.actionAreas +=
             ActionHitArea(
@@ -265,19 +371,25 @@ internal class EdgeRenderer(
 
         val hovered =
             interaction.hoveredAction ==
-                    ActionKey(edge.id, actionIndex)
+                    ActionKey(
+                        edge.id,
+                        actionIndex
+                    )
 
         /*
          * Background.
          */
         g2.color =
-            if (hovered) {
-                JBColor(
-                    Color(225, 235, 250),
-                    Color(65, 75, 90)
-                )
-            } else {
-                JBColor.PanelBackground
+            when {
+
+                selected ->
+                    SELECTED_LABEL_BACKGROUND
+
+                hovered ->
+                    HOVER_BACKGROUND
+
+                else ->
+                    JBColor.PanelBackground
             }
 
         g2.fillRoundRect(
@@ -290,15 +402,28 @@ internal class EdgeRenderer(
         )
 
         /*
-         * Hover border.
+         * Border.
          */
-        if (hovered) {
+        if (
+            selected ||
+            hovered
+        ) {
 
             g2.color =
-                JBColor.GRAY
+                if (selected) {
+                    SELECTED_COLOR
+                } else {
+                    JBColor.GRAY
+                }
 
             g2.stroke =
-                BasicStroke(1f)
+                BasicStroke(
+                    if (selected) {
+                        1.4f
+                    } else {
+                        1f
+                    }
+                )
 
             g2.drawRoundRect(
                 bounds.x,
@@ -314,32 +439,46 @@ internal class EdgeRenderer(
          * Text.
          */
         g2.color =
-            if (hovered) {
-                JBColor.foreground()
-            } else {
-                JBColor.GRAY
+            when {
+
+                selected ->
+                    SELECTED_TEXT_COLOR
+
+                hovered ->
+                    JBColor.foreground()
+
+                else ->
+                    JBColor.GRAY
             }
 
         g2.drawString(
             text,
-            position.x - textWidth / 2,
+            position.x -
+                    textWidth / 2,
             position.y
         )
 
-        g2.font = oldFont
-        g2.color = oldColor
-        g2.stroke = oldStroke
+        g2.font =
+            oldFont
+
+        g2.color =
+            oldColor
+
+        g2.stroke =
+            oldStroke
     }
 
-    /**
-     * Общий label chip для EVENT / GUARD.
-     */
+    // -------------------------------------------------------------------------
+    // Event / Guard chips
+    // -------------------------------------------------------------------------
+
     private fun drawLabelChip(
         g2: Graphics2D,
         text: String,
         position: Point,
         kind: LabelKind,
-        edgeId: String? = null
+        edgeId: String? = null,
+        selected: Boolean = false
     ) {
 
         val oldFont =
@@ -376,8 +515,11 @@ internal class EdgeRenderer(
         val metrics =
             g2.fontMetrics
 
-        val paddingX = 6
-        val paddingY = 3
+        val paddingX =
+            6
+
+        val paddingY =
+            3
 
         val textWidth =
             metrics.stringWidth(text)
@@ -391,14 +533,14 @@ internal class EdgeRenderer(
                     paddingY * 2
 
         /*
-         * position.x — центр label.
+         * position.x = center of label.
          */
         val chipX =
             position.x -
                     chipWidth / 2
 
         /*
-         * position.y — baseline текста.
+         * position.y = text baseline.
          */
         val chipY =
             position.y -
@@ -421,17 +563,15 @@ internal class EdgeRenderer(
             when (kind) {
 
                 LabelKind.EVENT ->
-                    hitRegistry.eventAreas[edgeId] =
-                        bounds
+                    hitRegistry.eventAreas[
+                        edgeId
+                    ] = bounds
 
                 LabelKind.GUARD ->
-                    hitRegistry.guardAreas[edgeId] =
-                        bounds
+                    hitRegistry.guardAreas[
+                        edgeId
+                    ] = bounds
 
-                /*
-                 * ACTION имеет отдельный renderer,
-                 * потому что на edge их может быть несколько.
-                 */
                 LabelKind.ACTION ->
                     Unit
             }
@@ -458,13 +598,16 @@ internal class EdgeRenderer(
          * Background.
          */
         g2.color =
-            if (hovered) {
-                JBColor(
-                    Color(225, 235, 250),
-                    Color(65, 75, 90)
-                )
-            } else {
-                JBColor.PanelBackground
+            when {
+
+                selected ->
+                    SELECTED_LABEL_BACKGROUND
+
+                hovered ->
+                    HOVER_BACKGROUND
+
+                else ->
+                    JBColor.PanelBackground
             }
 
         g2.fillRoundRect(
@@ -477,15 +620,28 @@ internal class EdgeRenderer(
         )
 
         /*
-         * Hover border.
+         * Border.
          */
-        if (hovered) {
+        if (
+            selected ||
+            hovered
+        ) {
 
             g2.color =
-                JBColor.GRAY
+                if (selected) {
+                    SELECTED_COLOR
+                } else {
+                    JBColor.GRAY
+                }
 
             g2.stroke =
-                BasicStroke(1f)
+                BasicStroke(
+                    if (selected) {
+                        1.4f
+                    } else {
+                        1f
+                    }
+                )
 
             g2.drawRoundRect(
                 chipX,
@@ -501,19 +657,22 @@ internal class EdgeRenderer(
          * Text.
          */
         g2.color =
-            when (kind) {
+            when {
 
-                LabelKind.EVENT ->
+                selected ->
+                    SELECTED_TEXT_COLOR
+
+                kind == LabelKind.EVENT ->
                     JBColor.foreground()
 
-                LabelKind.GUARD ->
-                    if (hovered) {
-                        JBColor.foreground()
-                    } else {
-                        JBColor.GRAY
-                    }
+                kind == LabelKind.GUARD &&
+                        hovered ->
+                    JBColor.foreground()
 
-                LabelKind.ACTION ->
+                kind == LabelKind.GUARD ->
+                    JBColor.GRAY
+
+                else ->
                     JBColor.foreground()
             }
 
@@ -523,13 +682,18 @@ internal class EdgeRenderer(
             position.y
         )
 
-        g2.font = oldFont
-        g2.stroke = oldStroke
-        g2.color = oldColor
+        g2.font =
+            oldFont
+
+        g2.stroke =
+            oldStroke
+
+        g2.color =
+            oldColor
     }
 
     // -------------------------------------------------------------------------
-    // Nodes
+    // Arrow
     // -------------------------------------------------------------------------
 
     private fun drawArrowHead(
@@ -540,41 +704,58 @@ internal class EdgeRenderer(
 
         val angle =
             atan2(
-                (to.y - from.y).toDouble(),
-                (to.x - from.x).toDouble()
+                (to.y - from.y)
+                    .toDouble(),
+                (to.x - from.x)
+                    .toDouble()
             )
 
-        val arrowLength = 10.0
+        val arrowLength =
+            10.0
 
         val angleOffset =
-            Math.toRadians(28.0)
+            Math.toRadians(
+                28.0
+            )
 
         val firstX =
             (
                     to.x -
                             arrowLength *
-                            cos(angle - angleOffset)
+                            cos(
+                                angle -
+                                        angleOffset
+                            )
                     ).toInt()
 
         val firstY =
             (
                     to.y -
                             arrowLength *
-                            sin(angle - angleOffset)
+                            sin(
+                                angle -
+                                        angleOffset
+                            )
                     ).toInt()
 
         val secondX =
             (
                     to.x -
                             arrowLength *
-                            cos(angle + angleOffset)
+                            cos(
+                                angle +
+                                        angleOffset
+                            )
                     ).toInt()
 
         val secondY =
             (
                     to.y -
                             arrowLength *
-                            sin(angle + angleOffset)
+                            sin(
+                                angle +
+                                        angleOffset
+                            )
                     ).toInt()
 
         g2.drawLine(
@@ -592,11 +773,49 @@ internal class EdgeRenderer(
         )
     }
 
-
+    // -------------------------------------------------------------------------
+    // Types / constants
+    // -------------------------------------------------------------------------
 
     private enum class LabelKind {
         EVENT,
         GUARD,
         ACTION
+    }
+
+    private companion object {
+
+        const val NORMAL_EDGE_WIDTH =
+            1.4f
+
+        const val SELECTED_EDGE_WIDTH =
+            3.2f
+
+        /*
+         * Light / dark theme aware accent.
+         */
+        val SELECTED_COLOR =
+            JBColor(
+                Color(45, 125, 220),
+                Color(90, 165, 255)
+            )
+
+        val SELECTED_LABEL_BACKGROUND =
+            JBColor(
+                Color(225, 238, 252),
+                Color(48, 65, 82)
+            )
+
+        val SELECTED_TEXT_COLOR =
+            JBColor(
+                Color(25, 80, 150),
+                Color(150, 205, 255)
+            )
+
+        val HOVER_BACKGROUND =
+            JBColor(
+                Color(225, 235, 250),
+                Color(65, 75, 90)
+            )
     }
 }

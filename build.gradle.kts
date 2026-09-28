@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.reznik.krd"
-version = "1.0-SNAPSHOT"
+version = "1.0.5-SNAPSHOT"
 
 repositories {
     mavenCentral()

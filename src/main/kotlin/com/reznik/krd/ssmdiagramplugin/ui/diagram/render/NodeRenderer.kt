@@ -11,20 +11,28 @@ import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.Point
 
-/** Renders state, choice, initial and end nodes. */
+/**
+ * Renders state, choice, initial and end nodes.
+ */
 internal class NodeRenderer(
     private val interaction: DiagramInteractionState
 ) {
 
-    fun render(g2: Graphics2D, graph: DiagramGraph, layout: DiagramLayout) {
-        drawNodes(g2, graph, layout)
-    }
-
-    private fun drawNodes(
+    fun render(
         g2: Graphics2D,
         graph: DiagramGraph,
         layout: DiagramLayout
     ) {
+
+        val selectedEdge =
+            interaction.selectedEdgeId
+                ?.let { selectedEdgeId ->
+                    graph.edges
+                        .firstOrNull {
+                            it.id ==
+                                    selectedEdgeId
+                        }
+                }
 
         graph.nodes.forEach { node ->
 
@@ -38,64 +46,92 @@ internal class NodeRenderer(
                     nodeLayout.y
                 )
 
+            /*
+             * Source and target of selected edge.
+             */
+            val selectedEndpoint =
+                selectedEdge != null &&
+                        (
+                                node.id ==
+                                        selectedEdge.source ||
+                                        node.id ==
+                                        selectedEdge.target
+                                )
+
             when (node.type) {
 
                 DiagramNode.Type.INITIAL_MARKER ->
                     drawInitialMarker(
-                        g2,
-                        position,
-                        nodeLayout.width,
-                        nodeLayout.height
+                        g2 = g2,
+                        position = position,
+                        width = nodeLayout.width,
+                        height = nodeLayout.height,
+                        selected = selectedEndpoint
                     )
 
                 DiagramNode.Type.END_MARKER ->
                     drawEndMarker(
-                        g2,
-                        position,
-                        nodeLayout.width,
-                        nodeLayout.height
+                        g2 = g2,
+                        position = position,
+                        width = nodeLayout.width,
+                        height = nodeLayout.height,
+                        selected = selectedEndpoint
                     )
 
                 DiagramNode.Type.CHOICE ->
                     drawChoiceNode(
-                        g2,
-                        node,
-                        position,
-                        nodeLayout.width,
-                        nodeLayout.height
+                        g2 = g2,
+                        node = node,
+                        position = position,
+                        width = nodeLayout.width,
+                        height = nodeLayout.height,
+                        selected = selectedEndpoint
                     )
 
                 DiagramNode.Type.STATE ->
                     drawStateNode(
-                        g2,
-                        node,
-                        position,
-                        nodeLayout.width,
-                        nodeLayout.height
+                        g2 = g2,
+                        node = node,
+                        position = position,
+                        width = nodeLayout.width,
+                        height = nodeLayout.height,
+                        selected = selectedEndpoint
                     )
             }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // State
+    // -------------------------------------------------------------------------
 
     private fun drawStateNode(
         g2: Graphics2D,
         node: DiagramNode,
         position: Point,
         width: Int,
-        height: Int
+        height: Int,
+        selected: Boolean
     ) {
 
         val hovered =
-            node.id == interaction.hoveredNodeId
+            node.id ==
+                    interaction.hoveredNodeId
 
+        /*
+         * Background.
+         */
         g2.color =
-            if (hovered) {
-                JBColor(
-                    Color(235, 242, 252),
-                    Color(55, 65, 78)
-                )
-            } else {
-                JBColor.PanelBackground
+            when {
+
+                selected ->
+                    SELECTED_BACKGROUND
+
+                hovered ->
+                    HOVER_BACKGROUND
+
+                else ->
+                    JBColor.PanelBackground
             }
 
         g2.fillRoundRect(
@@ -107,19 +143,34 @@ internal class NodeRenderer(
             14
         )
 
+        /*
+         * Border.
+         */
         g2.color =
-            if (hovered) {
-                JBColor.foreground()
-            } else {
-                JBColor.GRAY
+            when {
+
+                selected ->
+                    SELECTED_COLOR
+
+                hovered ->
+                    JBColor.foreground()
+
+                else ->
+                    JBColor.GRAY
             }
 
         g2.stroke =
             BasicStroke(
-                if (hovered) {
-                    2.2f
-                } else {
-                    1.4f
+                when {
+
+                    selected ->
+                        SELECTED_NODE_WIDTH
+
+                    hovered ->
+                        HOVER_NODE_WIDTH
+
+                    else ->
+                        NORMAL_NODE_WIDTH
                 }
             )
 
@@ -132,6 +183,9 @@ internal class NodeRenderer(
             14
         )
 
+        /*
+         * Label.
+         */
         val oldFont =
             g2.font
 
@@ -162,7 +216,11 @@ internal class NodeRenderer(
                     metrics.ascent
 
         g2.color =
-            JBColor.foreground()
+            if (selected) {
+                SELECTED_TEXT_COLOR
+            } else {
+                JBColor.foreground()
+            }
 
         g2.drawString(
             node.label,
@@ -174,12 +232,17 @@ internal class NodeRenderer(
             oldFont
     }
 
+    // -------------------------------------------------------------------------
+    // Choice
+    // -------------------------------------------------------------------------
+
     private fun drawChoiceNode(
         g2: Graphics2D,
         node: DiagramNode,
         position: Point,
         width: Int,
-        height: Int
+        height: Int,
+        selected: Boolean
     ) {
 
         val centerX =
@@ -190,7 +253,8 @@ internal class NodeRenderer(
             position.y +
                     height / 2
 
-        val halfSize = 26
+        val halfSize =
+            26
 
         val xPoints =
             intArrayOf(
@@ -209,16 +273,23 @@ internal class NodeRenderer(
             )
 
         val hovered =
-            node.id == interaction.hoveredNodeId
+            node.id ==
+                    interaction.hoveredNodeId
 
+        /*
+         * Background.
+         */
         g2.color =
-            if (hovered) {
-                JBColor(
-                    Color(235, 242, 252),
-                    Color(55, 65, 78)
-                )
-            } else {
-                JBColor.PanelBackground
+            when {
+
+                selected ->
+                    SELECTED_BACKGROUND
+
+                hovered ->
+                    HOVER_BACKGROUND
+
+                else ->
+                    JBColor.PanelBackground
             }
 
         g2.fillPolygon(
@@ -227,19 +298,34 @@ internal class NodeRenderer(
             4
         )
 
+        /*
+         * Border.
+         */
         g2.color =
-            if (hovered) {
-                JBColor.foreground()
-            } else {
-                JBColor.GRAY
+            when {
+
+                selected ->
+                    SELECTED_COLOR
+
+                hovered ->
+                    JBColor.foreground()
+
+                else ->
+                    JBColor.GRAY
             }
 
         g2.stroke =
             BasicStroke(
-                if (hovered) {
-                    2.2f
-                } else {
-                    1.4f
+                when {
+
+                    selected ->
+                        SELECTED_NODE_WIDTH
+
+                    hovered ->
+                        HOVER_NODE_WIDTH
+
+                    else ->
+                        NORMAL_NODE_WIDTH
                 }
             )
 
@@ -250,23 +336,34 @@ internal class NodeRenderer(
         )
 
         /*
-         * Название choice справа от diamond.
+         * Choice name.
          */
         g2.color =
-            JBColor.foreground()
+            if (selected) {
+                SELECTED_TEXT_COLOR
+            } else {
+                JBColor.foreground()
+            }
 
         g2.drawString(
             node.label,
-            centerX + halfSize + 12,
+            centerX +
+                    halfSize +
+                    12,
             centerY + 5
         )
     }
+
+    // -------------------------------------------------------------------------
+    // Initial
+    // -------------------------------------------------------------------------
 
     private fun drawInitialMarker(
         g2: Graphics2D,
         position: Point,
         width: Int,
-        height: Int
+        height: Int,
+        selected: Boolean
     ) {
 
         val centerX =
@@ -277,10 +374,19 @@ internal class NodeRenderer(
             position.y +
                     height / 2
 
-        val radius = 8
+        val radius =
+            if (selected) {
+                10
+            } else {
+                8
+            }
 
         g2.color =
-            JBColor.foreground()
+            if (selected) {
+                SELECTED_COLOR
+            } else {
+                JBColor.foreground()
+            }
 
         g2.fillOval(
             centerX - radius,
@@ -290,11 +396,16 @@ internal class NodeRenderer(
         )
     }
 
+    // -------------------------------------------------------------------------
+    // End
+    // -------------------------------------------------------------------------
+
     private fun drawEndMarker(
         g2: Graphics2D,
         position: Point,
         width: Int,
-        height: Int
+        height: Int,
+        selected: Boolean
     ) {
 
         val centerX =
@@ -305,11 +416,35 @@ internal class NodeRenderer(
             position.y +
                     height / 2
 
-        val outerRadius = 10
-        val innerRadius = 5
+        val outerRadius =
+            if (selected) {
+                12
+            } else {
+                10
+            }
+
+        val innerRadius =
+            if (selected) {
+                6
+            } else {
+                5
+            }
 
         g2.color =
-            JBColor.foreground()
+            if (selected) {
+                SELECTED_COLOR
+            } else {
+                JBColor.foreground()
+            }
+
+        g2.stroke =
+            BasicStroke(
+                if (selected) {
+                    SELECTED_NODE_WIDTH
+                } else {
+                    NORMAL_NODE_WIDTH
+                }
+            )
 
         g2.drawOval(
             centerX - outerRadius,
@@ -327,7 +462,42 @@ internal class NodeRenderer(
     }
 
     // -------------------------------------------------------------------------
-    // Arrow
+    // Colors
     // -------------------------------------------------------------------------
 
+    private companion object {
+
+        const val NORMAL_NODE_WIDTH =
+            1.4f
+
+        const val HOVER_NODE_WIDTH =
+            2.2f
+
+        const val SELECTED_NODE_WIDTH =
+            3.0f
+
+        val SELECTED_COLOR =
+            JBColor(
+                Color(45, 125, 220),
+                Color(90, 165, 255)
+            )
+
+        val SELECTED_BACKGROUND =
+            JBColor(
+                Color(225, 238, 252),
+                Color(48, 65, 82)
+            )
+
+        val SELECTED_TEXT_COLOR =
+            JBColor(
+                Color(25, 80, 150),
+                Color(150, 205, 255)
+            )
+
+        val HOVER_BACKGROUND =
+            JBColor(
+                Color(235, 242, 252),
+                Color(55, 65, 78)
+            )
+    }
 }

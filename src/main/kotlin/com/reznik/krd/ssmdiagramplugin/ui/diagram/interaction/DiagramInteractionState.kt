@@ -9,12 +9,12 @@ class DiagramInteractionState {
     var hoveredGuardEdgeId: String? = null
     var hoveredAction: ActionKey? = null
 
+    var selectedEdgeId: String? = null
+
     /** Clears all hover selections. */
     fun clear() {
-        hoveredNodeId = null
-        hoveredEventEdgeId = null
-        hoveredGuardEdgeId = null
-        hoveredAction = null
+        clearHover()
+        selectedEdgeId = null
     }
 
     /** Returns true when at least one diagram element is highlighted. */
@@ -23,6 +23,13 @@ class DiagramInteractionState {
             hoveredEventEdgeId != null ||
             hoveredGuardEdgeId != null ||
             hoveredAction != null
+
+    fun clearHover() {
+        hoveredNodeId = null
+        hoveredEventEdgeId = null
+        hoveredGuardEdgeId = null
+        hoveredAction = null
+    }
 }
 
 /** Identifies one action among all actions attached to an edge. */

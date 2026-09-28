@@ -3,6 +3,7 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramEdge
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import java.awt.Point
+import kotlin.math.abs
 
 /**
  * Routes diagram edges as readable orthogonal polylines between laid-out nodes.
@@ -11,74 +12,50 @@ class OrthogonalEdgeRouter {
 
     companion object {
 
-        /*
-         * Расстояние между параллельными transitions.
-         *
-         * Например:
-         *
-         * NEW -> CREATED / START_MANUALLY
-         * NEW -> CREATED / START_FROM_GROUP
+        /**
+         * Distance between parallel transitions.
          */
         private const val PARALLEL_EDGE_GAP = 18
 
-        /*
-         * Guard располагаем непосредственно
-         * над target state.
-         */
-        private const val GUARD_TARGET_OFFSET_Y = 12
-
-        /*
-         * Event располагаем выше guard.
-         *
-         * В итоге получаем:
-         *
-         * EVENT
-         *   |
-         * GUARD
-         *   v
-         * STATE
+        /**
+         * Event position relative to target.
          */
         private const val EVENT_TARGET_OFFSET_Y = 42
 
-        /*
-         * Для back edges.
+        /**
+         * Distance used for backward edges.
          */
         private const val BACK_EDGE_GAP = 70
 
-        /*
- * Первый action располагается
- * под target state.
- */
-        private const val ACTION_TARGET_OFFSET_Y = 24
-
-        /*
-         * Расстояние между несколькими actions.
+        /**
+         * Padding around nodes used by obstacle-aware routing.
          */
-        private const val ACTION_LABEL_GAP = 22
+        private const val NODE_OBSTACLE_PADDING = 24
+
+        /**
+         * Distance between the last action and target state.
+         */
+        private const val ACTION_TARGET_OFFSET_Y = 30
+
+        /**
+         * Distance between multiple actions.
+         */
+        private const val ACTION_LABEL_GAP = 24
+
+        /**
+         * Distance between guard and the first action.
+         */
+        private const val GUARD_ACTION_GAP = 5
+
+        /**
+         * Distance between event and guard/action stack.
+         */
+        private const val EVENT_GUARD_GAP = 30
     }
 
-    private fun createActionPositions(
-        edge: DiagramEdge,
-        target: NodeLayout,
-        parallelOffset: Int
-    ): List<Point> {
-
-        if (edge.actions.isEmpty()) {
-            return emptyList()
-        }
-
-        return edge.actions.mapIndexed { index, _ ->
-
-            Point(
-                target.center.x + parallelOffset,
-                target.bottom.y +
-                        ACTION_TARGET_OFFSET_Y +
-                        index * ACTION_LABEL_GAP
-            )
-        }
-    }
-
-    /** Calculates orthogonal geometry for all graph edges. */
+    /**
+     * Calculates orthogonal geometry for all graph edges.
+     */
     fun route(
         graph: DiagramGraph,
         nodes: Map<String, NodeLayout>
@@ -88,10 +65,9 @@ class OrthogonalEdgeRouter {
             mutableMapOf<String, EdgeLayout>()
 
         /*
-         * Группируем переходы с одинаковыми
-         * source и target.
+         * Group transitions with the same source and target.
          *
-         * Например:
+         * Example:
          *
          * NEW -> CREATED / START_MANUALLY
          * NEW -> CREATED / START_FROM_GROUP
@@ -122,18 +98,358 @@ class OrthogonalEdgeRouter {
                         count = parallelEdges.size
                     )
 
-                result[edge.id] =
+                val edgeLayout =
                     routeEdge(
                         edge = edge,
                         source = source,
                         target = target,
                         parallelOffset = parallelOffset
                     )
+
+                /*
+                 * After the normal route is built,
+                 * make sure its segments do not pass
+                 * through foreign nodes.
+                 */
+                val safePoints =
+                    avoidNodeIntersections(
+                        edge = edge,
+                        points = edgeLayout.points,
+                        nodes = nodes
+                    )
+
+                result[edge.id] =
+                    edgeLayout.copy(
+                        points = safePoints
+                    )
             }
         }
 
         return result
     }
+
+    // -------------------------------------------------------------------------
+    // Obstacle-aware routing
+    // -------------------------------------------------------------------------
+
+    private fun avoidNodeIntersections(
+        edge: DiagramEdge,
+        points: List<Point>,
+        nodes: Map<String, NodeLayout>
+    ): List<Point> {
+
+        if (points.size < 2) {
+            return points
+        }
+
+        /*
+         * Source and target are intentionally excluded.
+         *
+         * An edge naturally starts/ends on them.
+         */
+        val obstacles =
+            nodes
+                .filterKeys { nodeId ->
+                    nodeId != edge.source &&
+                            nodeId != edge.target
+                }
+                .values
+                .toList()
+
+        if (obstacles.isEmpty()) {
+            return points
+        }
+
+        val result =
+            mutableListOf<Point>()
+
+        result += points.first()
+
+        points
+            .zipWithNext()
+            .forEach { (start, end) ->
+
+                val replacement =
+                    routeSegmentAroundObstacles(
+                        start = start,
+                        end = end,
+                        obstacles = obstacles
+                    )
+
+                replacement
+                    .drop(1)
+                    .forEach { point ->
+                        result += point
+                    }
+            }
+
+        return simplifyPoints(result)
+    }
+
+    private fun routeSegmentAroundObstacles(
+        start: Point,
+        end: Point,
+        obstacles: List<NodeLayout>
+    ): List<Point> {
+
+        if (start.x == end.x) {
+            return routeVerticalSegmentAroundObstacles(
+                start = start,
+                end = end,
+                obstacles = obstacles
+            )
+        }
+
+        if (start.y == end.y) {
+            return routeHorizontalSegmentAroundObstacles(
+                start = start,
+                end = end,
+                obstacles = obstacles
+            )
+        }
+
+        /*
+         * Our router normally produces orthogonal segments,
+         * but leave a safe fallback.
+         */
+        return listOf(
+            start,
+            end
+        )
+    }
+
+    private fun routeVerticalSegmentAroundObstacles(
+        start: Point,
+        end: Point,
+        obstacles: List<NodeLayout>
+    ): List<Point> {
+
+        val minY =
+            minOf(
+                start.y,
+                end.y
+            )
+
+        val maxY =
+            maxOf(
+                start.y,
+                end.y
+            )
+
+        val blockingNodes =
+            obstacles.filter { node ->
+
+                val left =
+                    node.x - NODE_OBSTACLE_PADDING
+
+                val right =
+                    node.x +
+                            node.width +
+                            NODE_OBSTACLE_PADDING
+
+                val top =
+                    node.y - NODE_OBSTACLE_PADDING
+
+                val bottom =
+                    node.y +
+                            node.height +
+                            NODE_OBSTACLE_PADDING
+
+                start.x in left..right &&
+                        maxY >= top &&
+                        minY <= bottom
+            }
+
+        if (blockingNodes.isEmpty()) {
+            return listOf(
+                start,
+                end
+            )
+        }
+
+        /*
+         * Build one common corridor around all nodes
+         * blocking this vertical segment.
+         */
+        val leftCorridor =
+            blockingNodes.minOf { node ->
+                node.x
+            } - NODE_OBSTACLE_PADDING
+
+        val rightCorridor =
+            blockingNodes.maxOf { node ->
+                node.x + node.width
+            } + NODE_OBSTACLE_PADDING
+
+        /*
+         * Choose the nearest side.
+         */
+        val corridorX =
+            if (
+                abs(start.x - leftCorridor) <
+                abs(start.x - rightCorridor)
+            ) {
+                leftCorridor
+            } else {
+                rightCorridor
+            }
+
+        return listOf(
+            start,
+            Point(
+                corridorX,
+                start.y
+            ),
+            Point(
+                corridorX,
+                end.y
+            ),
+            end
+        )
+    }
+
+    private fun routeHorizontalSegmentAroundObstacles(
+        start: Point,
+        end: Point,
+        obstacles: List<NodeLayout>
+    ): List<Point> {
+
+        val minX =
+            minOf(
+                start.x,
+                end.x
+            )
+
+        val maxX =
+            maxOf(
+                start.x,
+                end.x
+            )
+
+        val blockingNodes =
+            obstacles.filter { node ->
+
+                val left =
+                    node.x - NODE_OBSTACLE_PADDING
+
+                val right =
+                    node.x +
+                            node.width +
+                            NODE_OBSTACLE_PADDING
+
+                val top =
+                    node.y - NODE_OBSTACLE_PADDING
+
+                val bottom =
+                    node.y +
+                            node.height +
+                            NODE_OBSTACLE_PADDING
+
+                start.y in top..bottom &&
+                        maxX >= left &&
+                        minX <= right
+            }
+
+        if (blockingNodes.isEmpty()) {
+            return listOf(
+                start,
+                end
+            )
+        }
+
+        val topCorridor =
+            blockingNodes.minOf { node ->
+                node.y
+            } - NODE_OBSTACLE_PADDING
+
+        val bottomCorridor =
+            blockingNodes.maxOf { node ->
+                node.y + node.height
+            } + NODE_OBSTACLE_PADDING
+
+        val corridorY =
+            if (
+                abs(start.y - topCorridor) <
+                abs(start.y - bottomCorridor)
+            ) {
+                topCorridor
+            } else {
+                bottomCorridor
+            }
+
+        return listOf(
+            start,
+            Point(
+                start.x,
+                corridorY
+            ),
+            Point(
+                end.x,
+                corridorY
+            ),
+            end
+        )
+    }
+
+    private fun simplifyPoints(
+        points: List<Point>
+    ): List<Point> {
+
+        if (points.size <= 2) {
+            return points
+        }
+
+        val result =
+            mutableListOf<Point>()
+
+        points.forEach { point ->
+
+            /*
+             * Remove duplicate points.
+             */
+            if (
+                result.isNotEmpty() &&
+                result.last() == point
+            ) {
+                return@forEach
+            }
+
+            if (result.size < 2) {
+                result += point
+                return@forEach
+            }
+
+            val first =
+                result[result.size - 2]
+
+            val second =
+                result[result.size - 1]
+
+            val sameVerticalLine =
+                first.x == second.x &&
+                        second.x == point.x
+
+            val sameHorizontalLine =
+                first.y == second.y &&
+                        second.y == point.y
+
+            if (
+                sameVerticalLine ||
+                sameHorizontalLine
+            ) {
+                result[result.lastIndex] =
+                    point
+            } else {
+                result += point
+            }
+        }
+
+        return result
+    }
+
+    // -------------------------------------------------------------------------
+    // Parallel edges
+    // -------------------------------------------------------------------------
 
     private fun calculateParallelOffset(
         index: Int,
@@ -145,12 +461,12 @@ class OrthogonalEdgeRouter {
         }
 
         /*
-         * Для двух:
+         * Two:
          *
          * -9
          * +9
          *
-         * Для трёх:
+         * Three:
          *
          * -18
          *   0
@@ -165,6 +481,10 @@ class OrthogonalEdgeRouter {
                 ).toInt()
     }
 
+    // -------------------------------------------------------------------------
+    // Routing
+    // -------------------------------------------------------------------------
+
     private fun routeEdge(
         edge: DiagramEdge,
         source: NodeLayout,
@@ -173,7 +493,7 @@ class OrthogonalEdgeRouter {
     ): EdgeLayout {
 
         /*
-         * Основной случай нашего layered layout:
+         * Normal layered transition:
          *
          * SOURCE
          *   |
@@ -190,7 +510,7 @@ class OrthogonalEdgeRouter {
         }
 
         /*
-         * Редкий случай:
+         * Same layer:
          *
          * SOURCE ----> TARGET
          */
@@ -204,7 +524,7 @@ class OrthogonalEdgeRouter {
         }
 
         /*
-         * Цикл / переход назад.
+         * Cycle / backward transition.
          */
         return routeBackward(
             edge = edge,
@@ -234,8 +554,8 @@ class OrthogonalEdgeRouter {
             )
 
         /*
-         * SOURCE и TARGET находятся
-         * строго друг под другом.
+         * Source and target are directly
+         * above/below each other.
          */
         if (start.x == end.x) {
 
@@ -244,29 +564,18 @@ class OrthogonalEdgeRouter {
                     start,
                     end
                 ),
-
-                /*
-                 * Event находится выше guard
-                 * и привязан к target.
-                 */
                 eventLabelPosition =
                     createEventPosition(
                         edge = edge,
                         target = target,
                         parallelOffset = parallelOffset
                     ),
-
-                /*
-                 * Guard находится непосредственно
-                 * над target.
-                 */
                 guardLabelPosition =
                     createGuardPosition(
                         edge = edge,
                         target = target,
                         parallelOffset = parallelOffset
                     ),
-
                 actionLabelPositions =
                     createActionPositions(
                         edge = edge,
@@ -286,7 +595,6 @@ class OrthogonalEdgeRouter {
          *                       v
          *                     TARGET
          */
-
         val middleY =
             (start.y + end.y) / 2 +
                     parallelOffset
@@ -310,30 +618,18 @@ class OrthogonalEdgeRouter {
                 secondCorner,
                 end
             ),
-
-            /*
-             * ВАЖНО:
-             *
-             * Event больше не находится
-             * посередине горизонтальной линии.
-             *
-             * Он привязан к вертикальному сегменту,
-             * который входит в target.
-             */
             eventLabelPosition =
                 createEventPosition(
                     edge = edge,
                     target = target,
                     parallelOffset = parallelOffset
                 ),
-
             guardLabelPosition =
                 createGuardPosition(
                     edge = edge,
                     target = target,
                     parallelOffset = parallelOffset
                 ),
-
             actionLabelPositions =
                 createActionPositions(
                     edge = edge,
@@ -380,8 +676,8 @@ class OrthogonalEdgeRouter {
             )
 
         /*
-         * Для горизонтального transition
-         * пока оставляем подписи над линией.
+         * For a horizontal transition keep the event
+         * above the line.
          */
         val eventPosition =
             if (edge.event != null) {
@@ -393,35 +689,28 @@ class OrthogonalEdgeRouter {
                 null
             }
 
-        val guardPosition =
-            if (edge.guard != null) {
-                Point(
-                    if (leftToRight) {
-                        end.x - 20
-                    } else {
-                        end.x + 20
-                    },
-                    end.y - 12
-                )
-            } else {
-                null
-            }
-
-        val actionLabelPositions =
-            createActionPositions(
-                edge = edge,
-                target = target,
-                parallelOffset = parallelOffset
-            )
-
+        /*
+         * Actions and guard still form a stack
+         * immediately above target.
+         */
         return EdgeLayout(
             points = listOf(
                 start,
                 end
             ),
             eventLabelPosition = eventPosition,
-            guardLabelPosition = guardPosition,
-            actionLabelPositions = actionLabelPositions,
+            guardLabelPosition =
+                createGuardPosition(
+                    edge = edge,
+                    target = target,
+                    parallelOffset = parallelOffset
+                ),
+            actionLabelPositions =
+                createActionPositions(
+                    edge = edge,
+                    target = target,
+                    parallelOffset = parallelOffset
+                )
         )
     }
 
@@ -445,8 +734,11 @@ class OrthogonalEdgeRouter {
             )
 
         /*
-         * Back edge выводим за правую
-         * часть соответствующих nodes.
+         * Back edge initially goes outside
+         * source/target.
+         *
+         * Obstacle-aware routing may modify
+         * these segments afterwards.
          */
         val sideX =
             maxOf(
@@ -478,23 +770,6 @@ class OrthogonalEdgeRouter {
                 null
             }
 
-        val guardPosition =
-            if (edge.guard != null) {
-                Point(
-                    target.right.x,
-                    target.y - GUARD_TARGET_OFFSET_Y
-                )
-            } else {
-                null
-            }
-
-        val actionLabelPositions =
-            createActionPositions(
-                edge = edge,
-                target = target,
-                parallelOffset = parallelOffset
-            )
-
         return EdgeLayout(
             points = listOf(
                 start,
@@ -503,23 +778,121 @@ class OrthogonalEdgeRouter {
                 end
             ),
             eventLabelPosition = eventPosition,
-            guardLabelPosition = guardPosition,
-            actionLabelPositions = actionLabelPositions,
+            guardLabelPosition =
+                createGuardPosition(
+                    edge = edge,
+                    target = target,
+                    parallelOffset = parallelOffset
+                ),
+            actionLabelPositions =
+                createActionPositions(
+                    edge = edge,
+                    target = target,
+                    parallelOffset = parallelOffset
+                )
+        )
+    }
+
+    // -------------------------------------------------------------------------
+    // Labels
+    // -------------------------------------------------------------------------
+
+    /**
+     * Actions are placed immediately before the target state.
+     *
+     * Visual order:
+     *
+     * ACTION 1
+     * ACTION 2
+     * ACTION 3
+     *    |
+     * TARGET
+     */
+    private fun createActionPositions(
+        edge: DiagramEdge,
+        target: NodeLayout,
+        parallelOffset: Int
+    ): List<Point> {
+
+        if (edge.actions.isEmpty()) {
+            return emptyList()
+        }
+
+        val actionsCount =
+            edge.actions.size
+
+        return edge.actions.mapIndexed { index, _ ->
+
+            /*
+             * Last action is closest to target.
+             */
+            val distanceFromTarget =
+                ACTION_TARGET_OFFSET_Y +
+                        (actionsCount - 1 - index) *
+                        ACTION_LABEL_GAP
+
+            Point(
+                target.center.x + parallelOffset,
+                target.top.y - distanceFromTarget
+            )
+        }
+    }
+
+    /**
+     * Guard is placed above all actions.
+     *
+     * GUARD
+     *
+     * ACTION 1
+     * ACTION 2
+     *
+     * TARGET
+     */
+    private fun createGuardPosition(
+        edge: DiagramEdge,
+        target: NodeLayout,
+        parallelOffset: Int
+    ): Point? {
+
+        /*
+         * Normal transition without guard:
+         * nothing is displayed.
+         *
+         * CHOICE_BRANCH without guard:
+         * renderer displays "otherwise".
+         */
+        val hasGuard =
+            edge.guard != null ||
+                    edge.type == DiagramEdge.Type.CHOICE_BRANCH
+
+        if (!hasGuard) {
+            return null
+        }
+
+        val actionsHeight =
+            edge.actions.size *
+                    ACTION_LABEL_GAP
+
+        return Point(
+            target.center.x + parallelOffset,
+            target.top.y -
+                    ACTION_TARGET_OFFSET_Y -
+                    actionsHeight -
+                    GUARD_ACTION_GAP
         )
     }
 
     /**
-     * Event привязываем к target.
+     * Event is placed above the whole
+     * guard + actions stack.
      *
-     * Получаем:
+     * EVENT
      *
-     *       EVENT
-     *         |
-     *       GUARD
-     *         v
-     *   +-----------+
-     *   |  TARGET   |
-     *   +-----------+
+     * GUARD
+     *
+     * ACTION
+     *
+     * TARGET
      */
     private fun createEventPosition(
         edge: DiagramEdge,
@@ -531,50 +904,35 @@ class OrthogonalEdgeRouter {
             return null
         }
 
-        return Point(
-            target.center.x + parallelOffset,
-            target.top.y - EVENT_TARGET_OFFSET_Y
-        )
-    }
+        val actionsHeight =
+            edge.actions.size *
+                    ACTION_LABEL_GAP
 
-    /**
-     * Guard располагается непосредственно
-     * перед target.
-     *
-     * Для choice это особенно важно:
-     *
-     *              CHOICE
-     *                ◇
-     *          /     |     \
-     *         /      |      \
-     *
-     * modernGuard usedGuard oldGuard
-     *      v        v        v
-     *   MODERN     USED      OLD
-     */
-    private fun createGuardPosition(
-        edge: DiagramEdge,
-        target: NodeLayout,
-        parallelOffset: Int
-    ): Point? {
+        val guardHeight =
+            if (
+                edge.guard != null ||
+                edge.type == DiagramEdge.Type.CHOICE_BRANCH
+            ) {
+                GUARD_ACTION_GAP
+            } else {
+                0
+            }
 
         /*
-         * У обычного transition без guard
-         * ничего не рисуем.
+         * EVENT_TARGET_OFFSET_Y provides the basic
+         * distance from target.
          *
-         * У CHOICE_BRANCH без guard
-         * SsmDiagramPanel покажет "otherwise".
+         * Additional height is added for actions
+         * and guard so labels cannot occupy
+         * the same position.
          */
-        if (
-            edge.guard == null &&
-            edge.type != DiagramEdge.Type.CHOICE_BRANCH
-        ) {
-            return null
-        }
-
         return Point(
             target.center.x + parallelOffset,
-            target.top.y - GUARD_TARGET_OFFSET_Y
+            target.top.y -
+                    EVENT_TARGET_OFFSET_Y -
+                    actionsHeight -
+                    guardHeight -
+                    EVENT_GUARD_GAP
         )
     }
 
