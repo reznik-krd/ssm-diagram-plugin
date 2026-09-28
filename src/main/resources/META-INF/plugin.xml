@@ -1,7 +1,7 @@
 <idea-plugin>
     <id>com.reznik.krd.ssm-diagram-plugin</id>
     <name>Ssm-diagram-plugin</name>
-    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+    <vendor>YourCompany</vendor>
     <depends>com.intellij.java</depends>
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
     <extensions defaultExtensionNs="com.intellij">
