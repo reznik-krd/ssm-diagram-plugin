@@ -14,50 +14,30 @@ import com.reznik.krd.ssmdiagramplugin.model.SsmTransition
 import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 
 /**
- * Extracts external transitions, events, guards and actions from a StateMachine configuration.
+ * Извлекает внешние переходы, события, guards и actions из конфигурации StateMachine.
  */
 class SsmTransitionAnalyzer {
 
-    private val expressionResolver =
-        ExpressionResolver()
+    private val expressionResolver = ExpressionResolver()
 
-    private val componentResolver =
-        ComponentReferenceResolver()
+    private val componentResolver = ComponentReferenceResolver()
 
-    /** Extracts all external transitions declared by the configuration class. */
-    fun analyze(
-        configClass: PsiClass
-    ): List<SsmTransition> {
+    /**
+     * Анализирует переданный PSI-элемент и возвращает соответствующую модель.
+     */
+    fun analyze(configClass: PsiClass): List<SsmTransition> {
+        val transitions = mutableListOf<SsmTransition>()
 
-        val transitions =
-            mutableListOf<SsmTransition>()
-
-        val calls =
-            PsiTreeUtil.findChildrenOfType(
-                configClass,
-                PsiMethodCallExpression::class.java
-            )
+        val calls = PsiTreeUtil.findChildrenOfType(configClass, PsiMethodCallExpression::class.java)
 
         calls
-            .filter {
-                it.methodExpression.referenceName ==
-                        "withExternal"
-            }
-            .forEach { withExternal ->
-
-                transitions +=
-                    parseExternalTransition(
-                        withExternal
-                    )
-            }
+            .filter { it.methodExpression.referenceName == "withExternal" }
+            .forEach { withExternal -> transitions += parseExternalTransition(withExternal) }
 
         return transitions
     }
 
-    private fun parseExternalTransition(
-        withExternal: PsiMethodCallExpression
-    ): List<SsmTransition> {
-
+    private fun parseExternalTransition(withExternal: PsiMethodCallExpression): List<SsmTransition> {
         /*
          * Собираем ТОЛЬКО текущий transition.
          *
@@ -73,91 +53,47 @@ class SsmTransitionAnalyzer {
          * Как только встречаем .and(),
          * текущий transition закончился.
          */
-        val chain =
-            collectFluentChain(
-                withExternal
-            )
+        val chain = collectFluentChain(withExternal)
+        val sourceCall = chain.findCall("source") ?: return emptyList()
+        val targetCall = chain.findCall("target") ?: return emptyList()
 
-        val sourceCall =
-            chain.findCall("source")
-                ?: return emptyList()
+        val sourceExpression = sourceCall
+            .argumentList
+            .expressions
+            .firstOrNull()
+            ?: return emptyList()
 
-        val targetCall =
-            chain.findCall("target")
-                ?: return emptyList()
+        val targetExpression = targetCall
+            .argumentList
+            .expressions
+            .firstOrNull()
+            ?: return emptyList()
 
-        val sourceExpression =
-            sourceCall
-                .argumentList
-                .expressions
-                .firstOrNull()
-                ?: return emptyList()
+        val sources = resolve(sourceExpression)
+        val targets = resolve(targetExpression)
 
-        val targetExpression =
-            targetCall
-                .argumentList
-                .expressions
-                .firstOrNull()
-                ?: return emptyList()
-
-        val sources =
-            resolve(
-                sourceExpression
-            )
-
-        val targets =
-            resolve(
-                targetExpression
-            )
-
-        if (
-            sources.isEmpty() ||
-            targets.isEmpty()
-        ) {
+        if (sources.isEmpty() || targets.isEmpty()) {
             return emptyList()
         }
 
-        /*
-         * Event.
-         */
-        val eventExpression =
-            chain
-                .findCall("event")
-                ?.argumentList
-                ?.expressions
-                ?.firstOrNull()
+        val eventExpression = chain
+            .findCall("event")
+            ?.argumentList
+            ?.expressions
+            ?.firstOrNull()
 
-        /*
-         * Guard.
-         *
-         * Теперь guard ищется только
-         * внутри текущего transition.
-         */
-        val guardExpression =
-            chain
-                .findCall("guard")
-                ?.argumentList
-                ?.expressions
-                ?.firstOrNull()
+        val guardExpression = chain
+            .findCall("guard")
+            ?.argumentList
+            ?.expressions
+            ?.firstOrNull()
 
-        /*
-         * Action + errorAction.
-         */
-        val actions =
-            chain
-                .filter {
-                    it.methodExpression.referenceName == "action"
-                }
-                .mapNotNull(::parseAction)
+        val actions = chain
+            .filter { it.methodExpression.referenceName == "action" }
+            .mapNotNull(::parseAction)
 
-        val event =
-            eventExpression
-                ?.let(::resolveSingleName)
-
-        val guard =
-            guardExpression
-                ?.let(componentResolver::resolve)
-
+        val event = eventExpression?.let(::resolveSingleName)
+        val guard = guardExpression?.let(componentResolver::resolve)
 
 
         /*
@@ -171,94 +107,55 @@ class SsmTransitionAnalyzer {
          * для каждого source.
          */
         return sources.flatMap { source ->
-
             targets.map { target ->
-
                 SsmTransition(
                     source = source.name,
                     target = target.name,
-
                     event = event,
                     guard = guard,
                     actions = actions,
-
                     sourceElement = source.source,
                     targetElement = target.source,
-
-                    eventElement = eventExpression
-                        ?.let {
-                            expressionResolver
-                                .resolve(it)
-                                .firstOrNull()
-                                ?.source
-                                ?: it
-                        }
+                    eventElement = eventExpression?.let {
+                        expressionResolver
+                            .resolve(it)
+                            .firstOrNull()
+                            ?.source
+                            ?: it
+                    }
                 )
             }
         }
     }
 
-    private fun parseAction(
-        call: PsiMethodCallExpression
-    ): SsmAction? {
-
-        val arguments =
-            call.argumentList.expressions
-
-        val actionExpression =
-            arguments.getOrNull(0)
-                ?: return null
-
-        val errorActionExpression =
-            arguments.getOrNull(1)
-
-        val action =
-            componentResolver.resolve(actionExpression)
-                ?: return null
-
-        val errorAction =
-            errorActionExpression
-                ?.let(componentResolver::resolve)
-
+    private fun parseAction(call: PsiMethodCallExpression): SsmAction? {
+        val arguments = call.argumentList.expressions
+        val actionExpression = arguments.getOrNull(0) ?: return null
+        val errorActionExpression = arguments.getOrNull(1)
+        val action = componentResolver.resolve(actionExpression) ?: return null
+        val errorAction = errorActionExpression?.let(componentResolver::resolve)
         return SsmAction(
             action = action,
             errorAction = errorAction
         )
     }
 
-    private fun resolve(
-        expression: PsiExpression
-    ): List<ResolvedValue> {
-
-        return expressionResolver
-            .resolve(expression)
+    private fun resolve(expression: PsiExpression): List<ResolvedValue> {
+        return expressionResolver.resolve(expression)
     }
 
-    private fun resolveSingleName(
-        expression: PsiExpression
-    ): String? {
-
+    private fun resolveSingleName(expression: PsiExpression): String? {
         return expressionResolver
             .resolve(expression)
             .firstOrNull()
             ?.name
-            ?: resolveReferenceName(
-                expression
-            )
+            ?: resolveReferenceName(expression)
     }
 
-    private fun resolveReferenceName(
-        expression: PsiExpression
-    ): String? {
-
+    private fun resolveReferenceName(expression: PsiExpression): String? {
         return when (expression) {
-
-            is PsiReferenceExpression ->
-                expression.referenceName
-
-            else ->
-                expression.text
+            is PsiReferenceExpression -> expression.referenceName
+            else -> expression.text
         }
     }
-
 }

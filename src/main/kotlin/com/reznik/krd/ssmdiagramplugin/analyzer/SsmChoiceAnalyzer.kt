@@ -13,14 +13,16 @@ import com.reznik.krd.ssmdiagramplugin.model.SsmChoice
 import com.reznik.krd.ssmdiagramplugin.model.SsmChoiceBranch
 
 /**
- * Extracts Spring StateMachine choice branches, guards and actions from Java PSI.
+ * Анализирует choice-переходы Spring StateMachine и преобразует их во внутреннюю модель.
  */
 class SsmChoiceAnalyzer {
 
     private val expressionResolver = ExpressionResolver()
     private val componentResolver = ComponentReferenceResolver()
 
-    /** Extracts all choice pseudo-states declared in the configuration class. */
+    /**
+     * Анализирует переданный PSI-элемент и возвращает соответствующую модель.
+     */
     fun analyze(configClass: PsiClass): List<SsmChoice> {
         val result = mutableListOf<SsmChoice>()
 
@@ -28,30 +30,20 @@ class SsmChoiceAnalyzer {
             configClass,
             PsiMethodCallExpression::class.java
         )
-
         calls
-            .filter {
-                it.methodExpression.referenceName == "withChoice"
-            }
-            .forEach { withChoice ->
-                parseChoice(withChoice)?.let(result::add)
-            }
+            .filter { it.methodExpression.referenceName == "withChoice" }
+            .forEach { withChoice -> parseChoice(withChoice)?.let(result::add) }
 
         return result
     }
 
-    private fun parseChoice(
-        withChoice: PsiMethodCallExpression
-    ): SsmChoice? {
-
+    /**
+     * Разбирает цепочку вызовов одного choice-состояния.
+     */
+    private fun parseChoice(withChoice: PsiMethodCallExpression): SsmChoice? {
         val chain = collectFluentChain(withChoice)
-
-        val sourceCall =
-            chain.findCall("source") ?: return null
-
-        val sourceExpression =
-            sourceCall.argumentList.expressions.firstOrNull()
-                ?: return null
+        val sourceCall = chain.findCall("source") ?: return null
+        val sourceExpression = sourceCall.argumentList.expressions.firstOrNull() ?: return null
 
         val source = expressionResolver
             .resolve(sourceExpression)
@@ -61,9 +53,7 @@ class SsmChoiceAnalyzer {
         val branches = mutableListOf<SsmChoiceBranch>()
 
         chain.forEach { call ->
-
             when (call.methodExpression.referenceName) {
-
                 "first" -> {
                     parseGuardedBranch(
                         call,
@@ -96,108 +86,60 @@ class SsmChoiceAnalyzer {
         )
     }
 
-    private fun parseGuardedBranch(
-        call: PsiMethodCallExpression,
-        type: SsmChoiceBranch.Type
-    ): SsmChoiceBranch? {
+    /**
+     * Разбирает условную ветвь choice-перехода.
+     */
+    private fun parseGuardedBranch(call: PsiMethodCallExpression, type: SsmChoiceBranch.Type): SsmChoiceBranch? {
+        val arguments = call.argumentList.expressions
+        val targetExpression = arguments.getOrNull(0) ?: return null
+        val guardExpression = arguments.getOrNull(1)
+        val actionExpression = arguments.getOrNull(2)
+        val errorActionExpression = arguments.getOrNull(3)
 
-        val arguments =
-            call.argumentList.expressions
+        val target = expressionResolver
+            .resolve(targetExpression)
+            .firstOrNull()
+            ?: return null
 
-        val targetExpression =
-            arguments.getOrNull(0)
-                ?: return null
+        val action = actionExpression?.let(componentResolver::resolve)
+        val errorAction = errorActionExpression?.let(componentResolver::resolve)
 
-        val guardExpression =
-            arguments.getOrNull(1)
-
-        val actionExpression =
-            arguments.getOrNull(2)
-
-        val errorActionExpression =
-            arguments.getOrNull(3)
-
-        val target =
-            expressionResolver
-                .resolve(targetExpression)
-                .firstOrNull()
-                ?: return null
-
-        val action =
-            actionExpression
-                ?.let(componentResolver::resolve)
-
-        val errorAction =
-            errorActionExpression
-                ?.let(componentResolver::resolve)
-
-        val actions =
-            if (action != null) {
-                listOf(
-                    SsmAction(
-                        action = action,
-                        errorAction = errorAction
-                    )
-                )
-            } else {
-                emptyList()
-            }
+        val actions = if (action != null) {
+            listOf(SsmAction(action = action, errorAction = errorAction))
+        } else {
+            emptyList()
+        }
 
         return SsmChoiceBranch(
             target = target.name,
             type = type,
-
-            guard = guardExpression
-                ?.let(componentResolver::resolve),
-
+            guard = guardExpression?.let(componentResolver::resolve),
             actions = actions,
-
             targetElement = target.source
         )
     }
 
-    private fun parseLastBranch(
-        call: PsiMethodCallExpression
-    ): SsmChoiceBranch? {
+    /**
+     * Разбирает завершающую ветвь choice-перехода.
+     */
+    private fun parseLastBranch(call: PsiMethodCallExpression): SsmChoiceBranch? {
+        val arguments = call.argumentList.expressions
+        val targetExpression = arguments.getOrNull(0) ?: return null
+        val actionExpression = arguments.getOrNull(1)
+        val errorActionExpression = arguments.getOrNull(2)
+        val target = expressionResolver
+            .resolve(targetExpression)
+            .firstOrNull()
+            ?: return null
 
-        val arguments =
-            call.argumentList.expressions
+        val action = actionExpression?.let(componentResolver::resolve)
+        val errorAction = errorActionExpression?.let(componentResolver::resolve)
 
-        val targetExpression =
-            arguments.getOrNull(0)
-                ?: return null
-
-        val actionExpression =
-            arguments.getOrNull(1)
-
-        val errorActionExpression =
-            arguments.getOrNull(2)
-
-        val target =
-            expressionResolver
-                .resolve(targetExpression)
-                .firstOrNull()
-                ?: return null
-
-        val action =
-            actionExpression
-                ?.let(componentResolver::resolve)
-
-        val errorAction =
-            errorActionExpression
-                ?.let(componentResolver::resolve)
-
-        val actions =
-            if (action != null) {
-                listOf(
-                    SsmAction(
-                        action = action,
-                        errorAction = errorAction
-                    )
-                )
-            } else {
-                emptyList()
-            }
+        val actions = if (action != null) {
+            listOf(SsmAction(action = action, errorAction = errorAction))
+        } else {
+            emptyList()
+        }
 
         return SsmChoiceBranch(
             target = target.name,
@@ -207,5 +149,4 @@ class SsmChoiceAnalyzer {
             targetElement = target.source
         )
     }
-
 }

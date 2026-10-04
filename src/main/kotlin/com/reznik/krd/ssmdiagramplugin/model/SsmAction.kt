@@ -1,7 +1,7 @@
 package com.reznik.krd.ssmdiagramplugin.model
 
 /**
- * Normal transition action and its optional error action.
+ * Описывает action перехода и связанную с ним ссылку на компонент.
  */
 data class SsmAction(
     val action: SsmComponentReference,

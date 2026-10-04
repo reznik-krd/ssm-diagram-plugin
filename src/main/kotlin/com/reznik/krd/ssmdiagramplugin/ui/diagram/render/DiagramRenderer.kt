@@ -7,7 +7,7 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import java.awt.Graphics2D
 
 /**
- * Coordinates diagram rendering without performing analysis, layout or navigation.
+ * Координирует отрисовку рёбер и узлов диаграммы.
  */
 class DiagramRenderer(
     interaction: DiagramInteractionState,
@@ -16,7 +16,9 @@ class DiagramRenderer(
     private val edgeRenderer = EdgeRenderer(interaction, hitRegistry)
     private val nodeRenderer = NodeRenderer(interaction)
 
-    /** Draws edges first and nodes second so state blocks stay above transition lines. */
+    /**
+     * Отрисовывает соответствующую часть диаграммы.
+     */
     fun render(g2: Graphics2D, graph: DiagramGraph, layout: DiagramLayout) {
         hitRegistry.clear()
         edgeRenderer.render(g2, graph, layout)

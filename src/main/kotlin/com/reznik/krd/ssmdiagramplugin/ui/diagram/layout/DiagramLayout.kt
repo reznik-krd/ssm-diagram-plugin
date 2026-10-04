@@ -3,7 +3,7 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 import java.awt.Dimension
 
 /**
- * Calculated node and edge geometry for a complete diagram.
+ * Хранит рассчитанную геометрию узлов, рёбер и общий размер диаграммы.
  */
 data class DiagramLayout(
     val nodes: Map<String, NodeLayout>,

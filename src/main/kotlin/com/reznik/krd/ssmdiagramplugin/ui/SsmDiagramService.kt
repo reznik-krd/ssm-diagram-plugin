@@ -6,34 +6,37 @@ import com.reznik.krd.ssmdiagramplugin.model.StateMachineModel
 
 @Service(Service.Level.PROJECT)
 /**
- * Project-level bridge that publishes the currently generated diagram model to UI listeners.
+ * Передаёт построенную модель StateMachine между action и Tool Window в рамках проекта.
  */
 class SsmDiagramService {
 
     private var model: StateMachineModel? = null
-
     private val listeners = mutableListOf<(StateMachineModel) -> Unit>()
 
+    /**
+     * Сохраняет модель и уведомляет подписчиков о новой диаграмме.
+     */
     fun show(model: StateMachineModel) {
         this.model = model
-
         listeners.forEach {
             it(model)
         }
     }
 
+    /**
+     * Возвращает последнюю отображённую модель.
+     */
     fun currentModel(): StateMachineModel? = model
 
-    fun addListener(
-        listener: (StateMachineModel) -> Unit
-    ) {
+    /**
+     * Регистрирует слушателя изменений текущей модели.
+     */
+    fun addListener(listener: (StateMachineModel) -> Unit) {
         listeners += listener
-
         model?.let(listener)
     }
 
     companion object {
-
         fun getInstance(project: Project): SsmDiagramService {
             return project.getService(SsmDiagramService::class.java)
         }

@@ -10,25 +10,17 @@ import com.reznik.krd.ssmdiagramplugin.analyzer.SsmPsiAnalyzer
 import com.reznik.krd.ssmdiagramplugin.model.StateMachineModel
 
 /**
- * Executes PSI-dependent StateMachine operations outside the EDT.
- *
- * All analysis runs as non-blocking read actions in smart mode.
- * Results are returned to the EDT through the supplied callbacks.
+ * Выполняет поиск и PSI-анализ StateMachine в фоновых read actions IntelliJ IDEA.
  */
-class SsmBackgroundTaskService(
-    private val project: Project
-) {
+class SsmBackgroundTaskService(private val project: Project) {
 
     private val configFinder = SsmConfigFinder()
     private val analyzer = SsmPsiAnalyzer()
 
     /**
-     * Searches the project for supported Spring StateMachine configurations.
+     * Асинхронно ищет конфигурации StateMachine в проекте.
      */
-    fun findConfigurations(
-        onSuccess: (List<PsiJavaFile>) -> Unit,
-        onError: (Throwable) -> Unit
-    ) {
+    fun findConfigurations(onSuccess: (List<PsiJavaFile>) -> Unit, onError: (Throwable) -> Unit) {
         ReadAction
             .nonBlocking<List<PsiJavaFile>> {
                 configFinder.findAll(project)
@@ -45,7 +37,7 @@ class SsmBackgroundTaskService(
     }
 
     /**
-     * Analyzes a StateMachine configuration and builds its semantic model.
+     * Анализирует переданный PSI-элемент и возвращает соответствующую модель.
      */
     fun analyze(
         psiFile: PsiJavaFile,
@@ -57,7 +49,6 @@ class SsmBackgroundTaskService(
                 if (!psiFile.isValid) {
                     return@nonBlocking null
                 }
-
                 analyzer.analyze(psiFile)
             }
             .inSmartMode(project)

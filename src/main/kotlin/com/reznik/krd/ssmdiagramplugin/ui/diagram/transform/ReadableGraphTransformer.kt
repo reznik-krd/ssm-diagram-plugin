@@ -5,7 +5,7 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 
 /**
- * Introduces visual state copies when doing so reduces high fan-in diagram clutter.
+ * Преобразует канонический граф в более читаемый визуальный граф с копиями состояний при необходимости.
  */
 class ReadableGraphTransformer {
 
@@ -20,7 +20,9 @@ class ReadableGraphTransformer {
         private const val MIN_DISTINCT_SOURCES_FOR_DUPLICATION = 3
     }
 
-    /** Produces a display-oriented graph while preserving logical state identity. */
+    /**
+     * Преобразует канонический граф в граф, оптимизированный для чтения.
+     */
     fun transform(
         graph: DiagramGraph
     ): DiagramGraph {
@@ -49,6 +51,9 @@ class ReadableGraphTransformer {
         )
     }
 
+    /**
+     * Находит состояния, которые стоит визуально продублировать из-за большого fan-in.
+     */
     private fun findDuplicationCandidates(
         graph: DiagramGraph
     ): List<DiagramNode> {
@@ -75,6 +80,9 @@ class ReadableGraphTransformer {
         }
     }
 
+    /**
+     * Создаёт визуальные копии состояния и перенаправляет на них входящие рёбра.
+     */
     private fun duplicateIncomingEdges(
         node: DiagramNode,
         nodes: MutableList<DiagramNode>,
@@ -165,6 +173,9 @@ class ReadableGraphTransformer {
         }
     }
 
+    /**
+     * Формирует уникальный идентификатор визуальной копии узла.
+     */
     private fun createCopyId(
         node: DiagramNode,
         edge: DiagramEdge,

@@ -21,75 +21,38 @@ import javax.swing.JButton
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
+import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
 
 /**
- * Main content of the SSM Diagram tool window.
- *
- * Coordinates configuration selection, asynchronous StateMachine analysis,
- * diagram lifecycle, progress indication and viewport controls.
+ * Управляет выбором конфигурации, генерацией диаграммы и элементами Tool Window.
  */
 class SsmDiagramToolWindowPanel(
     private val project: Project
 ) : JPanel(BorderLayout()) {
 
-    private val diagramService =
-        SsmDiagramService.getInstance(project)
+    private val diagramService = SsmDiagramService.getInstance(project)
+    private val backgroundTaskService = SsmBackgroundTaskService(project)
+    private val diagramPanel = SsmDiagramPanel(project)
 
-    private val backgroundTaskService =
-        SsmBackgroundTaskService(project)
+    private val scrollPane = JBScrollPane(diagramPanel)
+    private val configComboBox = ComboBox<PsiJavaFile>()
+    private val generateButton = JButton("Generate")
+    private val openConfigButton = JButton("Open")
+    private val refreshButton = JButton("Refresh")
+    private val clearButton = JButton("Clear")
+    private val zoomOutButton = JButton("−")
+    private val zoomButton = JButton("100%")
+    private val zoomInButton = JButton("+")
+    private val fitButton = JButton("Fit")
+    private val centerButton = JButton("Center")
 
-    private val diagramPanel =
-        SsmDiagramPanel(project)
-
-    private val scrollPane =
-        JBScrollPane(diagramPanel)
-
-    private val configComboBox =
-        ComboBox<PsiJavaFile>()
-
-    private val generateButton =
-        JButton("Generate")
-
-    private val refreshButton =
-        JButton("Refresh")
-
-    private val clearButton =
-        JButton("Clear")
-
-    private val zoomOutButton =
-        JButton("−")
-
-    private val zoomButton =
-        JButton("100%")
-
-    private val zoomInButton =
-        JButton("+")
-
-    private val fitButton =
-        JButton("Fit")
-
-    private val centerButton =
-        JButton("Center")
-
-    private val progressIcon =
-        AsyncProcessIcon("SSM Diagram progress")
-
-    private val statusLabel =
-        JBLabel()
-
-    private val statusPanel =
-        JPanel(
-            FlowLayout(
-                FlowLayout.LEFT,
-                8,
-                4
-            )
-        )
+    private val progressIcon = AsyncProcessIcon("SSM Diagram progress")
+    private val statusLabel = JBLabel()
+    private val statusPanel = JPanel(FlowLayout(FlowLayout.LEFT, 8, 4))
 
     /**
      * Path of the configuration currently rendered.
-     *
-     * It may differ from the configuration currently selected in the ComboBox.
      */
     private var displayedConfigPath: String? = null
 
@@ -105,31 +68,19 @@ class SsmDiagramToolWindowPanel(
 
     init {
         border = JBUI.Borders.empty()
-
         configureControls()
-
-        add(
-            createTopPanel(),
-            BorderLayout.NORTH
-        )
-
-        add(
-            scrollPane,
-            BorderLayout.CENTER
-        )
-
+        add(createTopPanel(), BorderLayout.NORTH)
+        add(scrollPane, BorderLayout.CENTER)
         installActions()
         subscribeToDiagramService()
-
         loadConfigs()
         updateButtons()
     }
 
     /**
-     * Configures component renderers and preferred sizes.
+     * Настраивает внешний вид и размеры элементов управления.
      */
     private fun configureControls() {
-
         configComboBox.renderer =
             SimpleListCellRenderer.create("") { file ->
                 file.virtualFile
@@ -155,115 +106,68 @@ class SsmDiagramToolWindowPanel(
     }
 
     /**
-     * Registers UI actions.
+     * Назначает обработчики кнопкам и элементам управления.
      */
     private fun installActions() {
-
-        generateButton.addActionListener {
-            generateSelectedConfig()
-        }
-
-        refreshButton.addActionListener {
-            refreshDiagram()
-        }
-
-        clearButton.addActionListener {
-            clearDiagram()
-        }
-
-        zoomOutButton.addActionListener {
-            diagramPanel.zoomOut()
-        }
-
-        zoomInButton.addActionListener {
-            diagramPanel.zoomIn()
-        }
-
+        generateButton.addActionListener { generateSelectedConfig() }
+        openConfigButton.addActionListener { openSelectedConfig() }
+        refreshButton.addActionListener { refreshDiagram() }
+        clearButton.addActionListener { clearDiagram() }
+        zoomOutButton.addActionListener { diagramPanel.zoomOut() }
+        zoomInButton.addActionListener { diagramPanel.zoomIn() }
         zoomButton.addActionListener {
             diagramPanel.resetZoom()
-
             SwingUtilities.invokeLater(
                 ::centerDiagram
             )
         }
-
-        fitButton.addActionListener {
-            fitDiagram()
-        }
-
-        centerButton.addActionListener {
-            centerDiagram()
-        }
-
+        fitButton.addActionListener { fitDiagram() }
+        centerButton.addActionListener { centerDiagram() }
         diagramPanel.setZoomChangedListener { zoom ->
-            zoomButton.text =
-                "${(zoom * 100).roundToInt()}%"
+            zoomButton.text = "${(zoom * 100).roundToInt()}%"
         }
     }
 
     /**
-     * Receives diagrams generated both from the Tool Window and project-view action.
+     * Подписывает панель на модели, поступающие из сервиса диаграммы.
      */
     private fun subscribeToDiagramService() {
-
         diagramService.addListener { model ->
-
             diagramPanel.setModel(model)
-
-            displayedConfigPath =
-                getConfigFile(model)
-                    ?.virtualFile
-                    ?.path
-
+            displayedConfigPath = getConfigFile(model)?.virtualFile?.path
             selectConfigForModel(model)
-
             updateButtons()
         }
     }
 
     /**
-     * Creates the complete Tool Window toolbar.
+     * Создаёт верхнюю область Tool Window.
      */
     private fun createTopPanel(): JPanel =
         JPanel().apply {
-
-            layout =
-                BoxLayout(
-                    this,
-                    BoxLayout.Y_AXIS
-                )
-
+            layout = BoxLayout(this, BoxLayout.Y_AXIS)
             add(createConfigurationPanel())
             add(createViewPanel())
             add(createStatusPanel())
         }
 
     /**
-     * Creates configuration controls.
+     * Создаёт строку выбора и управления StateMachine-конфигурацией.
      */
     private fun createConfigurationPanel(): JPanel =
-        createToolbarRow(
-            label = "Configuration:",
-            top = 4,
-            bottom = 0
-        ).apply {
-
+        createToolbarRow(label = "Configuration:", top = 4, bottom = 0).apply {
             add(configComboBox)
             add(generateButton)
+            add(openConfigButton)
             add(refreshButton)
             add(clearButton)
         }
 
     /**
-     * Creates viewport controls.
+     * Создаёт строку управления масштабом и положением диаграммы.
      */
     private fun createViewPanel(): JPanel =
-        createToolbarRow(
-            label = "View:",
-            top = 0,
-            bottom = 0
-        ).apply {
-
+        createToolbarRow(label = "View:", top = 0, bottom = 0).apply {
             add(zoomOutButton)
             add(zoomButton)
             add(zoomInButton)
@@ -272,116 +176,61 @@ class SsmDiagramToolWindowPanel(
         }
 
     /**
-     * Creates progress/status row.
+     * Создаёт строку прогресса фоновых операций.
      */
     private fun createStatusPanel(): JPanel {
-
-        statusPanel.border =
-            JBUI.Borders.empty(
-                0,
-                6,
-                4,
-                6
-            )
-
+        statusPanel.border = JBUI.Borders.empty(0, 6, 4, 6)
         statusPanel.add(progressIcon)
         statusPanel.add(statusLabel)
-
         return statusPanel
     }
 
     /**
-     * Creates a standard toolbar row.
+     * Создаёт стандартную строку панели инструментов.
      */
-    private fun createToolbarRow(
-        label: String,
-        top: Int,
-        bottom: Int
-    ): JPanel =
-        JPanel(
-            FlowLayout(
-                FlowLayout.LEFT,
-                8,
-                6
-            )
-        ).apply {
-
-            border =
-                JBUI.Borders.empty(
-                    top,
-                    6,
-                    bottom,
-                    6
-                )
-
-            add(
-                JBLabel(label)
-            )
+    private fun createToolbarRow(label: String, top: Int, bottom: Int): JPanel =
+        JPanel(FlowLayout(FlowLayout.LEFT, 8, 6)).apply {
+            border = JBUI.Borders.empty(top, 6, bottom, 6)
+            add(JBLabel(label))
         }
 
     /**
-     * Searches for available StateMachine configurations asynchronously.
+     * Асинхронно загружает список доступных StateMachine-конфигураций.
      */
-    private fun loadConfigs(
-        onComplete: (() -> Unit)? = null
-    ) {
-
-        val selectedPath =
-            selectedConfig()
-                ?.virtualFile
-                ?.path
-
-        val operation =
-            beginOperation(
-                "Searching configurations..."
-            )
+    private fun loadConfigs(onComplete: (() -> Unit)? = null) {
+        val selectedPath = selectedConfig()?.virtualFile?.path
+        val operation = beginOperation("Searching configurations...")
 
         backgroundTaskService.findConfigurations(
             onSuccess = { configs ->
-
                 if (!isCurrentOperation(operation)) {
                     return@findConfigurations
                 }
-
                 configComboBox.removeAllItems()
-
                 configs.forEach(
                     configComboBox::addItem
                 )
-
                 if (selectedPath != null) {
                     selectConfigByPath(selectedPath)
                 }
-
                 finishOperation(operation)
-
                 onComplete?.invoke()
             },
             onError = { error ->
-
                 if (!isCurrentOperation(operation)) {
                     return@findConfigurations
                 }
-
                 finishOperation(operation)
-
-                showError(
-                    "Failed to search StateMachine configurations.",
-                    error
-                )
+                showError("Failed to search StateMachine configurations.", error)
             }
         )
     }
 
     /**
-     * Generates a diagram for the configuration selected in the ComboBox.
+     * Запускает генерацию диаграммы для выбранной конфигурации.
      */
     private fun generateSelectedConfig() {
-
-        val config =
-            selectedConfig()
-                ?: return
-
+        val config = selectedConfig() ?: return
         generateConfig(
             psiFile = config,
             status = "Generating diagram..."
@@ -389,47 +238,55 @@ class SsmDiagramToolWindowPanel(
     }
 
     /**
-     * Asynchronously analyzes the supplied configuration.
+     * Открывает выбранный класс StateMachine-конфигурации в редакторе.
      */
-    private fun generateConfig(
-        psiFile: PsiJavaFile,
-        status: String
-    ) {
+    private fun openSelectedConfig() {
+        val config = selectedConfig() ?: return
 
-        val operation =
-            beginOperation(status)
+        val configClass =
+            ReadAction.compute<com.intellij.psi.PsiClass?, RuntimeException> {
+                config.classes.firstOrNull()
+            } ?: return
+
+        val virtualFile = configClass.containingFile
+            ?.virtualFile
+            ?: return
+
+        OpenFileDescriptor(
+            project,
+            virtualFile,
+            configClass.textOffset
+        ).navigate(true)
+    }
+
+    /**
+     * Асинхронно анализирует конфигурацию и передаёт модель в сервис диаграммы.
+     */
+    private fun generateConfig(psiFile: PsiJavaFile, status: String) {
+        val operation = beginOperation(status)
 
         backgroundTaskService.analyze(
             psiFile = psiFile,
             onSuccess = { model ->
-
                 if (!isCurrentOperation(operation)) {
                     return@analyze
                 }
-
                 finishOperation(operation)
-
                 if (model == null) {
-
                     Messages.showWarningDialog(
                         project,
                         "Spring StateMachine configuration was not found.",
                         DIALOG_TITLE
                     )
-
                     return@analyze
                 }
-
                 diagramService.show(model)
             },
             onError = { error ->
-
                 if (!isCurrentOperation(operation)) {
                     return@analyze
                 }
-
                 finishOperation(operation)
-
                 showError(
                     "Failed to generate StateMachine diagram.",
                     error
@@ -439,49 +296,28 @@ class SsmDiagramToolWindowPanel(
     }
 
     /**
-     * Re-analyzes the configuration currently displayed in the diagram.
+     * Повторно анализирует конфигурацию текущей отображаемой диаграммы.
      */
     private fun refreshDiagram() {
+        val path = displayedConfigPath ?: return
 
-        val path =
-            displayedConfigPath
-                ?: return
-
-        val currentConfig =
-            findConfigByPath(path)
-
+        val currentConfig = findConfigByPath(path)
         if (currentConfig != null) {
-
-            generateConfig(
-                psiFile = currentConfig,
-                status = "Refreshing diagram..."
-            )
-
+            generateConfig(psiFile = currentConfig, status = "Refreshing diagram...")
             return
         }
 
-        /*
-         * The ComboBox may be stale because the file was renamed,
-         * moved or recreated. Refresh the configuration list first.
-         */
         loadConfigs {
-
-            val refreshedConfig =
-                findConfigByPath(path)
-
+            val refreshedConfig = findConfigByPath(path)
             if (refreshedConfig == null) {
-
                 clearDiagram()
-
                 Messages.showWarningDialog(
                     project,
                     "The StateMachine configuration is no longer available.",
                     DIALOG_TITLE
                 )
-
                 return@loadConfigs
             }
-
             generateConfig(
                 psiFile = refreshedConfig,
                 status = "Refreshing diagram..."
@@ -490,215 +326,125 @@ class SsmDiagramToolWindowPanel(
     }
 
     /**
-     * Clears the rendered diagram while keeping configuration selection.
+     * Очищает текущую диаграмму, сохраняя выбранную конфигурацию.
      */
     private fun clearDiagram() {
-
-        /*
-         * Invalidate callbacks from an operation started before Clear.
-         */
         operationSequence++
-
         busy = false
-
         hideProgress()
-
         diagramPanel.clear()
-
         displayedConfigPath = null
-
         scrollPane
             .viewport
             .viewPosition =
             Point(0, 0)
-
         updateButtons()
     }
 
     /**
-     * Fits the entire diagram into the visible viewport.
+     * Подбирает масштаб так, чтобы диаграмма помещалась в видимую область.
      */
     private fun fitDiagram() {
-
-        diagramPanel.fitToViewport(
-            scrollPane.viewport.extentSize
-        )
-
+        diagramPanel.fitToViewport(scrollPane.viewport.extentSize)
         SwingUtilities.invokeLater(
             ::centerDiagram
         )
     }
 
     /**
-     * Centers the current diagram inside the scroll viewport.
+     * Центрирует диаграмму внутри viewport.
      */
     private fun centerDiagram() {
+        val viewport = scrollPane.viewport
+        val viewSize = diagramPanel.preferredSize
+        val extentSize = viewport.extentSize
 
-        val viewport =
-            scrollPane.viewport
-
-        val viewSize =
-            diagramPanel.preferredSize
-
-        val extentSize =
-            viewport.extentSize
-
-        val x =
-            (
-                    (viewSize.width - extentSize.width) /
-                            2
-                    )
-                .coerceAtLeast(0)
-
-        val y =
-            (
-                    (viewSize.height - extentSize.height) /
-                            2
-                    )
-                .coerceAtLeast(0)
-
-        viewport.viewPosition =
-            Point(x, y)
+        val x = ((viewSize.width - extentSize.width) / 2).coerceAtLeast(0)
+        val y = ((viewSize.height - extentSize.height) / 2).coerceAtLeast(0)
+        viewport.viewPosition = Point(x, y)
     }
 
     /**
-     * Starts a new asynchronous UI operation.
-     *
-     * Returns its unique sequence number.
+     * Начинает фоновую UI-операцию и показывает прогресс.
      */
-    private fun beginOperation(
-        status: String
-    ): Long {
-
-        val operation =
-            ++operationSequence
-
+    private fun beginOperation(status: String): Long {
+        val operation = ++operationSequence
         busy = true
-
         showProgress(status)
         updateButtons()
-
         return operation
     }
 
     /**
-     * Completes an asynchronous operation if it is still current.
+     * Завершает актуальную фоновую операцию и скрывает прогресс.
      */
-    private fun finishOperation(
-        operation: Long
-    ) {
-
+    private fun finishOperation(operation: Long) {
         if (!isCurrentOperation(operation)) {
             return
         }
-
         busy = false
-
         hideProgress()
         updateButtons()
     }
 
     /**
-     * Returns true when the callback belongs to the latest operation.
+     * Проверяет, относится ли callback к последней запущенной операции.
      */
-    private fun isCurrentOperation(
-        operation: Long
-    ): Boolean =
-        operation == operationSequence
+    private fun isCurrentOperation(operation: Long): Boolean = operation == operationSequence
 
     /**
-     * Shows the indeterminate progress indicator.
+     * Показывает индикатор и текст текущей операции.
      */
-    private fun showProgress(
-        status: String
-    ) {
-
+    private fun showProgress(status: String) {
         statusLabel.text = status
-
         progressIcon.isVisible = true
         statusLabel.isVisible = true
         statusPanel.isVisible = true
-
         progressIcon.resume()
-
         statusPanel.revalidate()
         statusPanel.repaint()
     }
 
     /**
-     * Hides the progress indicator.
+     * Скрывает индикатор фоновой операции.
      */
     private fun hideProgress() {
-
         progressIcon.suspend()
-
         progressIcon.isVisible = false
         statusLabel.isVisible = false
         statusPanel.isVisible = false
-
         statusPanel.revalidate()
         statusPanel.repaint()
     }
 
     /**
-     * Updates control availability according to current UI state.
+     * Обновляет доступность кнопок согласно текущему состоянию панели.
      */
     private fun updateButtons() {
+        val hasSelectedConfig = selectedConfig() != null
+        val hasDiagram = displayedConfigPath != null
+        configComboBox.isEnabled = !busy && configComboBox.itemCount > 0
+        generateButton.isEnabled = !busy && hasSelectedConfig
+        openConfigButton.isEnabled = !busy && hasSelectedConfig
+        refreshButton.isEnabled = !busy && hasDiagram
 
-        val hasSelectedConfig =
-            selectedConfig() != null
-
-        val hasDiagram =
-            displayedConfigPath != null
-
-        configComboBox.isEnabled =
-            !busy &&
-                    configComboBox.itemCount > 0
-
-        generateButton.isEnabled =
-            !busy &&
-                    hasSelectedConfig
-
-        refreshButton.isEnabled =
-            !busy &&
-                    hasDiagram
-
-        /*
-         * Clear and viewport controls remain available while analysis
-         * is running so the existing diagram can still be inspected.
-         */
-        clearButton.isEnabled =
-            hasDiagram
-
-        zoomOutButton.isEnabled =
-            hasDiagram
-
-        zoomButton.isEnabled =
-            hasDiagram
-
-        zoomInButton.isEnabled =
-            hasDiagram
-
-        fitButton.isEnabled =
-            hasDiagram
-
-        centerButton.isEnabled =
-            hasDiagram
+        clearButton.isEnabled = hasDiagram
+        zoomOutButton.isEnabled = hasDiagram
+        zoomButton.isEnabled = hasDiagram
+        zoomInButton.isEnabled = hasDiagram
+        fitButton.isEnabled = hasDiagram
+        centerButton.isEnabled = hasDiagram
     }
 
     /**
-     * Returns the configuration currently selected in the ComboBox.
+     * Возвращает конфигурацию, выбранную в ComboBox.
      */
-    private fun selectedConfig(): PsiJavaFile? =
-        configComboBox.selectedItem
-                as? PsiJavaFile
+    private fun selectedConfig(): PsiJavaFile? = configComboBox.selectedItem as? PsiJavaFile
 
     /**
-     * Finds a loaded configuration by its virtual-file path.
+     * Ищет загруженную конфигурацию по пути файла.
      */
-    private fun findConfigByPath(
-        path: String
-    ): PsiJavaFile? =
+    private fun findConfigByPath(path: String): PsiJavaFile? =
         (0 until configComboBox.itemCount)
             .map(configComboBox::getItemAt)
             .firstOrNull { file ->
@@ -706,11 +452,9 @@ class SsmDiagramToolWindowPanel(
             }
 
     /**
-     * Returns the Java file containing the analyzed configuration.
+     * Возвращает Java-файл, содержащий анализируемую конфигурацию.
      */
-    private fun getConfigFile(
-        model: StateMachineModel
-    ): PsiJavaFile? =
+    private fun getConfigFile(model: StateMachineModel): PsiJavaFile? =
         model
             .config
             .configClass
@@ -718,78 +462,47 @@ class SsmDiagramToolWindowPanel(
                 as? PsiJavaFile
 
     /**
-     * Synchronizes ComboBox selection with a displayed model.
+     * Синхронизирует выбор ComboBox с отображаемой моделью.
      */
-    private fun selectConfigForModel(
-        model: StateMachineModel
-    ) {
-
-        val path =
-            getConfigFile(model)
-                ?.virtualFile
-                ?.path
-                ?: return
+    private fun selectConfigForModel(model: StateMachineModel) {
+        val path = getConfigFile(model)
+            ?.virtualFile
+            ?.path
+            ?: return
 
         if (selectConfigByPath(path)) {
             return
         }
-
-        /*
-         * Do not perform another search while another asynchronous
-         * operation is already active.
-         */
         if (busy) {
             return
         }
-
         loadConfigs {
             selectConfigByPath(path)
         }
     }
 
     /**
-     * Selects a configuration with the supplied path.
+     * Выбирает конфигурацию в ComboBox по пути файла.
      */
-    private fun selectConfigByPath(
-        path: String
-    ): Boolean {
-
-        for (
-        index in
-        0 until configComboBox.itemCount
-        ) {
-
-            val file =
-                configComboBox.getItemAt(index)
-
-            if (
-                file.virtualFile?.path ==
-                path
-            ) {
-
-                configComboBox.selectedIndex =
-                    index
-
+    private fun selectConfigByPath(path: String): Boolean {
+        for (index in 0 until configComboBox.itemCount) {
+            val file = configComboBox.getItemAt(index)
+            if (file.virtualFile?.path == path) {
+                configComboBox.selectedIndex = index
                 return true
             }
         }
-
         return false
     }
 
     /**
-     * Displays an unexpected background-operation error.
+     * Показывает диалог с ошибкой фоновой операции.
      */
-    private fun showError(
-        message: String,
-        error: Throwable
-    ) {
-
+    private fun showError(message: String, error: Throwable) {
         Messages.showErrorDialog(
             project,
             buildString {
                 append(message)
-
                 error.message
                     ?.takeIf { it.isNotBlank() }
                     ?.let {
@@ -802,14 +515,8 @@ class SsmDiagramToolWindowPanel(
     }
 
     private companion object {
-
-        const val CONFIG_COMBO_WIDTH =
-            230
-
-        const val ZOOM_BUTTON_WIDTH =
-            70
-
-        const val DIALOG_TITLE =
-            "Spring StateMachine Diagram"
+        const val CONFIG_COMBO_WIDTH = 230
+        const val ZOOM_BUTTON_WIDTH = 70
+        const val DIALOG_TITLE = "Spring StateMachine Diagram"
     }
 }

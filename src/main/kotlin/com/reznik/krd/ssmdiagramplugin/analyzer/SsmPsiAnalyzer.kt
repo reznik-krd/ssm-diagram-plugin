@@ -4,7 +4,7 @@ import com.intellij.psi.PsiJavaFile
 import com.reznik.krd.ssmdiagramplugin.model.StateMachineModel
 
 /**
- * Coordinates PSI analyzers and produces the semantic StateMachineModel.
+ * Координирует PSI-анализ конфигурации и собирает итоговую модель StateMachine.
  */
 class SsmPsiAnalyzer {
 
@@ -13,7 +13,9 @@ class SsmPsiAnalyzer {
     private val transitionAnalyzer = SsmTransitionAnalyzer()
     private val choiceAnalyzer = SsmChoiceAnalyzer()
 
-    /** Analyzes one Java file and returns its complete StateMachine model. */
+    /**
+     * Анализирует переданный PSI-элемент и возвращает соответствующую модель.
+     */
     fun analyze(file: PsiJavaFile): StateMachineModel? {
         val config = configDetector.detect(file) ?: return null
         val states = stateAnalyzer.analyze(config.configClass)

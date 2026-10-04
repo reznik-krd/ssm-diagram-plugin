@@ -6,7 +6,7 @@ import java.awt.Point
 import kotlin.math.abs
 
 /**
- * Routes diagram edges as readable orthogonal polylines between laid-out nodes.
+ * Строит ортогональные маршруты переходов и размещает их подписи.
  */
 class OrthogonalEdgeRouter {
 
@@ -54,15 +54,14 @@ class OrthogonalEdgeRouter {
     }
 
     /**
-     * Calculates orthogonal geometry for all graph edges.
+     * Строит маршруты всех рёбер и позиции их подписей.
      */
     fun route(
         graph: DiagramGraph,
         nodes: Map<String, NodeLayout>
     ): Map<String, EdgeLayout> {
 
-        val result =
-            mutableMapOf<String, EdgeLayout>()
+        val result = mutableMapOf<String, EdgeLayout>()
 
         /*
          * Group transitions with the same source and target.
@@ -72,8 +71,7 @@ class OrthogonalEdgeRouter {
          * NEW -> CREATED / START_MANUALLY
          * NEW -> CREATED / START_FROM_GROUP
          */
-        val groups =
-            graph.edges.groupBy { edge ->
+        val groups = graph.edges.groupBy { edge ->
                 EdgePair(
                     source = edge.source,
                     target = edge.target
@@ -81,9 +79,7 @@ class OrthogonalEdgeRouter {
             }
 
         groups.values.forEach { parallelEdges ->
-
             parallelEdges.forEachIndexed { index, edge ->
-
                 val source =
                     nodes[edge.source]
                         ?: return@forEachIndexed
@@ -132,6 +128,9 @@ class OrthogonalEdgeRouter {
     // Obstacle-aware routing
     // -------------------------------------------------------------------------
 
+    /**
+     * Корректирует маршрут, чтобы сегменты по возможности обходили узлы.
+     */
     private fun avoidNodeIntersections(
         edge: DiagramEdge,
         points: List<Point>,
@@ -186,6 +185,9 @@ class OrthogonalEdgeRouter {
         return simplifyPoints(result)
     }
 
+    /**
+     * Выбирает способ обхода препятствий для отдельного сегмента.
+     */
     private fun routeSegmentAroundObstacles(
         start: Point,
         end: Point,
@@ -218,42 +220,22 @@ class OrthogonalEdgeRouter {
         )
     }
 
+    /**
+     * Строит обход препятствий для вертикального сегмента.
+     */
     private fun routeVerticalSegmentAroundObstacles(
         start: Point,
         end: Point,
         obstacles: List<NodeLayout>
     ): List<Point> {
+        val minY = minOf(start.y, end.y)
+        val maxY = maxOf(start.y, end.y)
 
-        val minY =
-            minOf(
-                start.y,
-                end.y
-            )
-
-        val maxY =
-            maxOf(
-                start.y,
-                end.y
-            )
-
-        val blockingNodes =
-            obstacles.filter { node ->
-
-                val left =
-                    node.x - NODE_OBSTACLE_PADDING
-
-                val right =
-                    node.x +
-                            node.width +
-                            NODE_OBSTACLE_PADDING
-
-                val top =
-                    node.y - NODE_OBSTACLE_PADDING
-
-                val bottom =
-                    node.y +
-                            node.height +
-                            NODE_OBSTACLE_PADDING
+        val blockingNodes = obstacles.filter { node ->
+                val left = node.x - NODE_OBSTACLE_PADDING
+                val right = node.x + node.width + NODE_OBSTACLE_PADDING
+                val top = node.y - NODE_OBSTACLE_PADDING
+                val bottom = node.y + node.height + NODE_OBSTACLE_PADDING
 
                 start.x in left..right &&
                         maxY >= top &&
@@ -261,10 +243,7 @@ class OrthogonalEdgeRouter {
             }
 
         if (blockingNodes.isEmpty()) {
-            return listOf(
-                start,
-                end
-            )
+            return listOf(start, end)
         }
 
         /*
@@ -308,42 +287,23 @@ class OrthogonalEdgeRouter {
         )
     }
 
+    /**
+     * Строит обход препятствий для горизонтального сегмента.
+     */
     private fun routeHorizontalSegmentAroundObstacles(
         start: Point,
         end: Point,
         obstacles: List<NodeLayout>
     ): List<Point> {
-
-        val minX =
-            minOf(
-                start.x,
-                end.x
-            )
-
-        val maxX =
-            maxOf(
-                start.x,
-                end.x
-            )
+        val minX = minOf(start.x, end.x)
+        val maxX = maxOf(start.x, end.x)
 
         val blockingNodes =
             obstacles.filter { node ->
-
-                val left =
-                    node.x - NODE_OBSTACLE_PADDING
-
-                val right =
-                    node.x +
-                            node.width +
-                            NODE_OBSTACLE_PADDING
-
-                val top =
-                    node.y - NODE_OBSTACLE_PADDING
-
-                val bottom =
-                    node.y +
-                            node.height +
-                            NODE_OBSTACLE_PADDING
+                val left = node.x - NODE_OBSTACLE_PADDING
+                val right = node.x + node.width + NODE_OBSTACLE_PADDING
+                val top = node.y - NODE_OBSTACLE_PADDING
+                val bottom = node.y + node.height + NODE_OBSTACLE_PADDING
 
                 start.y in top..bottom &&
                         maxX >= left &&
@@ -391,6 +351,9 @@ class OrthogonalEdgeRouter {
         )
     }
 
+    /**
+     * Удаляет лишние и коллинеарные точки маршрута.
+     */
     private fun simplifyPoints(
         points: List<Point>
     ): List<Point> {
@@ -451,6 +414,9 @@ class OrthogonalEdgeRouter {
     // Parallel edges
     // -------------------------------------------------------------------------
 
+    /**
+     * Рассчитывает смещение для параллельных переходов.
+     */
     private fun calculateParallelOffset(
         index: Int,
         count: Int
@@ -485,6 +451,9 @@ class OrthogonalEdgeRouter {
     // Routing
     // -------------------------------------------------------------------------
 
+    /**
+     * Выбирает стратегию маршрутизации одного ребра.
+     */
     private fun routeEdge(
         edge: DiagramEdge,
         source: NodeLayout,
@@ -534,6 +503,9 @@ class OrthogonalEdgeRouter {
         )
     }
 
+    /**
+     * Строит маршрут перехода к состоянию ниже по иерархии.
+     */
     private fun routeDownward(
         edge: DiagramEdge,
         source: NodeLayout,
@@ -639,6 +611,9 @@ class OrthogonalEdgeRouter {
         )
     }
 
+    /**
+     * Строит горизонтальный маршрут между состояниями одного уровня.
+     */
     private fun routeHorizontal(
         edge: DiagramEdge,
         source: NodeLayout,
@@ -714,6 +689,9 @@ class OrthogonalEdgeRouter {
         )
     }
 
+    /**
+     * Строит обходной маршрут обратного перехода.
+     */
     private fun routeBackward(
         edge: DiagramEdge,
         source: NodeLayout,
@@ -798,15 +776,7 @@ class OrthogonalEdgeRouter {
     // -------------------------------------------------------------------------
 
     /**
-     * Actions are placed immediately before the target state.
-     *
-     * Visual order:
-     *
-     * ACTION 1
-     * ACTION 2
-     * ACTION 3
-     *    |
-     * TARGET
+     * Рассчитывает позиции подписей actions.
      */
     private fun createActionPositions(
         edge: DiagramEdge,
@@ -839,14 +809,7 @@ class OrthogonalEdgeRouter {
     }
 
     /**
-     * Guard is placed above all actions.
-     *
-     * GUARD
-     *
-     * ACTION 1
-     * ACTION 2
-     *
-     * TARGET
+     * Рассчитывает позицию подписи guard.
      */
     private fun createGuardPosition(
         edge: DiagramEdge,
@@ -883,16 +846,7 @@ class OrthogonalEdgeRouter {
     }
 
     /**
-     * Event is placed above the whole
-     * guard + actions stack.
-     *
-     * EVENT
-     *
-     * GUARD
-     *
-     * ACTION
-     *
-     * TARGET
+     * Рассчитывает позицию подписи event.
      */
     private fun createEventPosition(
         edge: DiagramEdge,

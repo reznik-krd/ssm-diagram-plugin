@@ -5,7 +5,7 @@ import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiElement
 
 /**
- * Resolved action or guard reference with optional PSI navigation targets.
+ * Хранит отображаемое имя компонента и PSI-ссылку на его класс.
  */
 data class SsmComponentReference(
     val name: @NlsSafe String?,

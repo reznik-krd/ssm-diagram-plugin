@@ -7,45 +7,27 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ClassInheritorsSearch
 
 /**
- * Finds Spring StateMachine configuration files available in the current project.
- *
- * Must be called from a read action while the project is in smart mode.
+ * Ищет доступные конфигурации Spring StateMachine в Java-исходниках проекта.
  */
 class SsmConfigFinder {
 
     /**
-     * Finds all supported StateMachine Java configuration files in the project.
+     * Ищет все поддерживаемые StateMachine-конфигурации в проекте.
      */
-    fun findAll(
-        project: Project
-    ): List<PsiJavaFile> {
+    fun findAll(project: Project): List<PsiJavaFile> {
+        val projectScope = GlobalSearchScope.projectScope(project)
 
-        val projectScope =
-            GlobalSearchScope.projectScope(project)
-
-        val configurerClass =
-            JavaPsiFacade
-                .getInstance(project)
-                .findClass(
-                    CONFIGURER_CLASS,
-                    GlobalSearchScope.allScope(project)
-                )
-                ?: return emptyList()
+        val configurerClass = JavaPsiFacade
+            .getInstance(project)
+            .findClass(CONFIGURER_CLASS, GlobalSearchScope.allScope(project))
+            ?: return emptyList()
 
         return ClassInheritorsSearch
-            .search(
-                configurerClass,
-                projectScope,
-                true
-            )
+            .search(configurerClass, projectScope, true)
             .findAll()
             .asSequence()
-            .mapNotNull { psiClass ->
-                psiClass.containingFile as? PsiJavaFile
-            }
-            .distinctBy { psiFile ->
-                psiFile.virtualFile?.path
-            }
+            .mapNotNull { psiClass -> psiClass.containingFile as? PsiJavaFile }
+            .distinctBy { psiFile -> psiFile.virtualFile?.path }
             .sortedBy { psiFile ->
                 psiFile.classes
                     .firstOrNull()
@@ -56,8 +38,6 @@ class SsmConfigFinder {
     }
 
     private companion object {
-
-        const val CONFIGURER_CLASS =
-            "org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter"
+        const val CONFIGURER_CLASS = "org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter"
     }
 }

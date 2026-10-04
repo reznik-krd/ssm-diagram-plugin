@@ -1,19 +1,16 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 
-import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramEdge
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 import java.awt.Dimension
 import java.util.ArrayDeque
 
 /**
- * Places diagram nodes in top-to-bottom hierarchy and delegates edge routing.
+ * Располагает узлы графа по уровням и рассчитывает геометрию диаграммы.
  */
 class HierarchicalLayoutEngine {
 
-    private val edgeRouter =
-        OrthogonalEdgeRouter()
-
+    private val edgeRouter = OrthogonalEdgeRouter()
     private val nodeWidth = 180
     private val nodeHeight = 60
 
@@ -28,22 +25,21 @@ class HierarchicalLayoutEngine {
     private val horizontalGap = 140
 
     /*
- * Между уровнями оставляем место для:
- *
- * - actions предыдущего transition;
- * - event;
- * - guard;
- * - routing.
- */
+     * Между уровнями оставляем место для:
+     *
+     * - actions предыдущего transition;
+     * - event;
+     * - guard;
+     * - routing.
+     */
     private val verticalGap = 180
 
     private val margin = 100
 
-    /** Calculates node levels, coordinates and routed edges for the graph. */
-    fun layout(
-        graph: DiagramGraph
-    ): DiagramLayout {
-
+    /**
+     * Рассчитывает положение узлов, маршруты рёбер и размер диаграммы.
+     */
+    fun layout(graph: DiagramGraph): DiagramLayout {
         if (graph.nodes.isEmpty()) {
             return DiagramLayout(
                 nodes = emptyMap(),
@@ -55,8 +51,7 @@ class HierarchicalLayoutEngine {
         /*
          * 1. Определяем уровень каждого node.
          */
-        val levels =
-            calculateLevels(graph)
+        val levels = calculateLevels(graph)
 
         /*
          * 2. Группируем nodes по уровням.
@@ -78,36 +73,23 @@ class HierarchicalLayoutEngine {
          * Это уже первая простая попытка
          * уменьшить пересечения.
          */
-        orderLayers(
-            graph = graph,
-            layers = layers
-        )
+        orderLayers(graph = graph, layers = layers)
 
         /*
          * 4. Назначаем реальные координаты.
          */
-        val nodes =
-            assignCoordinates(
-                layers
-            )
+        val nodes = assignCoordinates(layers)
 
         /*
          * 5. Только после окончательного положения
          * nodes строим edges.
          */
-        val edges =
-            edgeRouter.route(
-                graph = graph,
-                nodes = nodes
-            )
+        val edges = edgeRouter.route(graph = graph, nodes = nodes)
 
         /*
          * 6. Размер canvas считаем по фактическим nodes.
          */
-        val size =
-            calculateCanvasSize(
-                nodes
-            )
+        val size = calculateCanvasSize(nodes)
 
         return DiagramLayout(
             nodes = nodes,
@@ -117,85 +99,42 @@ class HierarchicalLayoutEngine {
     }
 
     /**
-     * Определяет вертикальный layer каждого node.
-     *
-     * Основная идея:
-     *
-     * parent
-     *   |
-     *   v
-     * child
-     *
-     * child всегда получает следующий уровень.
-     *
-     * Back edges не заставляют бесконечно
-     * двигать вершины вниз.
+     * Распределяет узлы по вертикальным уровням графа.
      */
-    private fun calculateLevels(
-        graph: DiagramGraph
-    ): Map<String, Int> {
-
-        val levels =
-            mutableMapOf<String, Int>()
-
-        val roots =
-            findRoots(graph)
-
-        val queue =
-            ArrayDeque<DiagramNode>()
+    private fun calculateLevels(graph: DiagramGraph): Map<String, Int> {
+        val levels = mutableMapOf<String, Int>()
+        val roots = findRoots(graph)
+        val queue = ArrayDeque<DiagramNode>()
 
         roots.forEach { root ->
-
             levels[root.id] = 0
-
             queue.add(root)
         }
 
         while (queue.isNotEmpty()) {
-
-            val current =
-                queue.removeFirst()
-
-            val currentLevel =
-                levels[current.id] ?: 0
-
+            val current = queue.removeFirst()
+            val currentLevel = levels[current.id] ?: 0
             graph.outgoing(current.id)
                 .forEach { edge ->
-
                     val target =
                         graph.node(edge.target)
                             ?: return@forEach
 
-                    /*
-                     * Уже посещённую вершину повторно
-                     * вниз не двигаем.
-                     *
-                     * Это защищает от циклов/back edges.
-                     */
                     if (target.id in levels) {
                         return@forEach
                     }
 
-                    levels[target.id] =
-                        currentLevel + 1
+                    levels[target.id] = currentLevel + 1
 
                     queue.add(target)
                 }
         }
 
-        /*
-         * Если существуют disconnected nodes,
-         * кладём их после основной StateMachine.
-         */
-        var fallbackLevel =
-            (levels.values.maxOrNull() ?: -1) + 1
+        var fallbackLevel = (levels.values.maxOrNull() ?: -1) + 1
 
         graph.nodes
-            .filter {
-                it.id !in levels
-            }
+            .filter { it.id !in levels }
             .forEach { node ->
-
                 levels[node.id] =
                     fallbackLevel
             }
@@ -204,44 +143,30 @@ class HierarchicalLayoutEngine {
     }
 
     /**
-     * Упорядочиваем каждый layer относительно
-     * родителей предыдущего layer.
-     *
-     * Пока это простая версия barycenter.
+     * Упорядочивает узлы внутри уровней для уменьшения пересечений.
      */
     private fun orderLayers(
         graph: DiagramGraph,
         layers: MutableMap<Int, MutableList<DiagramNode>>
     ) {
+        val layerNumbers = layers.keys.sorted()
 
-        val layerNumbers =
-            layers.keys.sorted()
-
-        /*
-         * Самый верхний layer сортировать
-         * относительно родителей бессмысленно.
-         */
         layerNumbers
             .drop(1)
             .forEach { level ->
+                val currentLayer = layers[level]
+                    ?: return@forEach
 
-                val currentLayer =
-                    layers[level]
-                        ?: return@forEach
+                val previousLayer = layers[level - 1]
+                    ?: return@forEach
 
-                val previousLayer =
-                    layers[level - 1]
-                        ?: return@forEach
-
-                val previousPositions =
-                    previousLayer
-                        .mapIndexed { index, node ->
-                            node.id to index
-                        }
-                        .toMap()
+                val previousPositions = previousLayer
+                    .mapIndexed { index, node ->
+                        node.id to index
+                    }
+                    .toMap()
 
                 currentLayer.sortBy { node ->
-
                     calculateParentBarycenter(
                         graph = graph,
                         node = node,
@@ -253,16 +178,7 @@ class HierarchicalLayoutEngine {
     }
 
     /**
-     * Средняя позиция родителей.
-     *
-     * Например:
-     *
-     * A   B   C
-     *     \ /
-     *      X
-     *
-     * X будет стремиться находиться
-     * между B и C.
+     * Вычисляет среднюю позицию родителей для сортировки узлов слоя.
      */
     private fun calculateParentBarycenter(
         graph: DiagramGraph,
@@ -284,127 +200,73 @@ class HierarchicalLayoutEngine {
     }
 
     /**
-     * После того как известны layers и порядок nodes
-     * внутри них, назначаем координаты.
+     * Назначает итоговые координаты узлам.
      */
     private fun assignCoordinates(
         layers: Map<Int, List<DiagramNode>>
     ): MutableMap<String, NodeLayout> {
 
-        val result =
-            mutableMapOf<String, NodeLayout>()
+        val result = mutableMapOf<String, NodeLayout>()
+        val maxNodesInLayer = layers.values.maxOfOrNull { it.size } ?: 1
 
-        val maxNodesInLayer =
-            layers.values
-                .maxOfOrNull {
-                    it.size
-                }
-                ?: 1
-
-        val maxLayerWidth =
-            calculateLayerWidth(
-                maxNodesInLayer
-            )
+        val maxLayerWidth = calculateLayerWidth(maxNodesInLayer)
 
         layers.forEach { (level, layerNodes) ->
-
-            val layerWidth =
-                calculateLayerWidth(
-                    layerNodes.size
-                )
+            val layerWidth = calculateLayerWidth(layerNodes.size)
 
             /*
              * Каждый ряд центрируем относительно
              * самого широкого ряда.
              */
-            var x =
-                margin +
-                        (maxLayerWidth - layerWidth) / 2
-
-            val y =
-                margin +
-                        level *
-                        (nodeHeight + verticalGap)
+            var x = margin + (maxLayerWidth - layerWidth) / 2
+            val y = margin + level * (nodeHeight + verticalGap)
 
             layerNodes.forEach { node ->
-
-                result[node.id] =
-                    NodeLayout(
-                        x = x,
-                        y = y,
-                        width = nodeWidth,
-                        height = nodeHeight
-                    )
-
-                x +=
-                    nodeWidth +
-                            horizontalGap
+                result[node.id] = NodeLayout(x = x, y = y, width = nodeWidth, height = nodeHeight)
+                x += nodeWidth + horizontalGap
             }
         }
 
         return result
     }
 
-    private fun calculateLayerWidth(
-        nodeCount: Int
-    ): Int {
-
+    /**
+     * Вычисляет ширину одного уровня графа.
+     */
+    private fun calculateLayerWidth(nodeCount: Int): Int {
         if (nodeCount <= 0) {
             return 0
         }
-
-        return nodeCount * nodeWidth +
-                (nodeCount - 1) *
-                horizontalGap
+        return nodeCount * nodeWidth + (nodeCount - 1) * horizontalGap
     }
 
-    private fun calculateCanvasSize(
-        nodes: Map<String, NodeLayout>
-    ): Dimension {
-
+    /**
+     * Вычисляет необходимый размер области диаграммы.
+     */
+    private fun calculateCanvasSize(nodes: Map<String, NodeLayout>): Dimension {
         if (nodes.isEmpty()) {
-            return Dimension(
-                600,
-                500
-            )
+            return Dimension(600, 500)
         }
 
-        val maxX =
-            nodes.values.maxOf {
-                it.x + it.width
-            }
-
-        val maxY =
-            nodes.values.maxOf {
-                it.y + it.height
-            }
+        val maxX = nodes.values.maxOf { it.x + it.width }
+        val maxY = nodes.values.maxOf { it.y + it.height }
 
         return Dimension(
-            maxOf(
-                maxX + margin,
-                600
-            ),
-
-            maxOf(
-                maxY + margin,
-                500
-            )
+            maxOf(maxX + margin, 600),
+            maxOf(maxY + margin, 500)
         )
     }
 
-    private fun findRoots(
-        graph: DiagramGraph
-    ): List<DiagramNode> {
+    /**
+     * Находит корневые узлы для начала иерархического обхода.
+     */
+    private fun findRoots(graph: DiagramGraph): List<DiagramNode> {
 
         /*
          * Наш виртуальный Spring INITIAL
          * всегда главный root.
          */
-        val initialNodes =
-            graph.nodes.filter {
-                it.type ==
-                        DiagramNode.Type.INITIAL_MARKER
-            }
+        val initialNodes = graph.nodes.filter { it.type == DiagramNode.Type.INITIAL_MARKER }
 
         if (initialNodes.isNotEmpty()) {
             return initialNodes
@@ -413,11 +275,10 @@ class HierarchicalLayoutEngine {
         /*
          * Fallback для графов без explicit initial.
          */
-        val roots =
-            graph.nodes.filter {
-                graph.incoming(it.id)
-                    .isEmpty()
-            }
+        val roots = graph.nodes.filter {
+            graph.incoming(it.id)
+                .isEmpty()
+        }
 
         if (roots.isNotEmpty()) {
             return roots

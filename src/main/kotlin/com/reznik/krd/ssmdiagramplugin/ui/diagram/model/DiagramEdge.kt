@@ -5,7 +5,7 @@ import com.reznik.krd.ssmdiagramplugin.model.SsmAction
 import com.reznik.krd.ssmdiagramplugin.model.SsmComponentReference
 
 /**
- * Visual edge with transition semantics required by the renderer.
+ * Представляет визуальное ребро диаграммы и данные связанного перехода.
  */
 data class DiagramEdge(
     val id: String,

@@ -1,7 +1,7 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.model
 
 /**
- * Visual graph consumed by layout and rendering stages.
+ * Хранит визуальные узлы и рёбра диаграммы и предоставляет быстрые выборки связей.
  */
 data class DiagramGraph(
     val nodes: List<DiagramNode>,

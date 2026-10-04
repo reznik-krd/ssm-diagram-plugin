@@ -12,12 +12,15 @@ import java.awt.Graphics2D
 import java.awt.Point
 
 /**
- * Renders state, choice, initial and end nodes.
+ * Отрисовывает состояния, choice и технические initial/end маркеры.
  */
 internal class NodeRenderer(
     private val interaction: DiagramInteractionState
 ) {
 
+    /**
+     * Отрисовывает соответствующую часть диаграммы.
+     */
     fun render(
         g2: Graphics2D,
         graph: DiagramGraph,
@@ -125,6 +128,9 @@ internal class NodeRenderer(
     // State
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает обычное состояние.
+     */
     private fun drawStateNode(
         g2: Graphics2D,
         node: DiagramNode,
@@ -244,6 +250,9 @@ internal class NodeRenderer(
     // Choice
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает choice-состояние.
+     */
     private fun drawChoiceNode(
         g2: Graphics2D,
         node: DiagramNode,
@@ -356,6 +365,9 @@ internal class NodeRenderer(
     // Initial
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает initial-маркер.
+     */
     private fun drawInitialMarker(
         g2: Graphics2D,
         position: Point,
@@ -398,6 +410,9 @@ internal class NodeRenderer(
     // End
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает end-маркер.
+     */
     private fun drawEndMarker(
         g2: Graphics2D,
         position: Point,

@@ -21,13 +21,16 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Renders transition lines, labels, arrows and action chips.
+ * Отрисовывает переходы, стрелки, подписи и состояние выделения рёбер.
  */
 internal class EdgeRenderer(
     private val interaction: DiagramInteractionState,
     private val hitRegistry: DiagramHitRegistry
 ) {
 
+    /**
+     * Отрисовывает соответствующую часть диаграммы.
+     */
     fun render(
         g2: Graphics2D,
         graph: DiagramGraph,
@@ -44,6 +47,9 @@ internal class EdgeRenderer(
     // Edges
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает набор рёбер с учётом порядка выделения.
+     */
     private fun drawEdges(
         g2: Graphics2D,
         graph: DiagramGraph,
@@ -99,6 +105,9 @@ internal class EdgeRenderer(
             }
     }
 
+    /**
+     * Отрисовывает маршрут и стрелку одного перехода.
+     */
     private fun drawEdge(
         g2: Graphics2D,
         edge: DiagramEdge,
@@ -199,6 +208,9 @@ internal class EdgeRenderer(
     // Edge labels
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает event, guard и actions перехода.
+     */
     private fun drawEdgeLabels(
         g2: Graphics2D,
         edge: DiagramEdge,
@@ -308,6 +320,9 @@ internal class EdgeRenderer(
     // Actions
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает подпись action и регистрирует её hit-area.
+     */
     private fun drawActionLabel(
         g2: Graphics2D,
         edge: DiagramEdge,
@@ -480,6 +495,9 @@ internal class EdgeRenderer(
     // Event / Guard chips
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает универсальную текстовую плашку подписи.
+     */
     private fun drawLabelChip(
         g2: Graphics2D,
         text: String,
@@ -704,6 +722,9 @@ internal class EdgeRenderer(
     // Arrow
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает наконечник стрелки перехода.
+     */
     private fun drawArrowHead(
         g2: Graphics2D,
         from: Point,
@@ -827,6 +848,9 @@ internal class EdgeRenderer(
             )
     }
 
+    /**
+     * Определяет, должен ли переход отображаться как выбранный.
+     */
     private fun isSelected(
         edge: DiagramEdge,
         graph: DiagramGraph

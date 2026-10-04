@@ -6,46 +6,29 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 
 /**
- * Creates the persistent SSM Diagram tool window content.
+ * Создаёт Tool Window SSM Diagram и подключает его основную панель.
  */
 class SsmDiagramToolWindowFactory : ToolWindowFactory {
 
-    override fun shouldBeAvailable(
-        project: Project
-    ): Boolean {
+    /**
+     * Определяет доступность Tool Window для открытого проекта.
+     */
+    override fun shouldBeAvailable(project: Project): Boolean {
         return true
     }
 
-    override fun createToolWindowContent(
-        project: Project,
-        toolWindow: ToolWindow
-    ) {
-
-        /*
-         * Теперь ToolWindow содержит не непосредственно
-         * JBScrollPane, а полноценную панель:
-         *
-         * ┌───────────────────────────────────┐
-         * │ Configuration / Generate / Refresh│
-         * ├───────────────────────────────────┤
-         * │                                   │
-         * │            Diagram                │
-         * │                                   │
-         * └───────────────────────────────────┘
-         */
-        val panel =
-            SsmDiagramToolWindowPanel(
-                project
+    /**
+     * Создаёт и добавляет содержимое Tool Window.
+     */
+    override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
+        val panel = SsmDiagramToolWindowPanel(project)
+        val content = ContentFactory
+            .getInstance()
+            .createContent(
+                panel,
+                "Diagram",
+                false
             )
-
-        val content =
-            ContentFactory
-                .getInstance()
-                .createContent(
-                    panel,
-                    "Diagram",
-                    false
-                )
 
         toolWindow
             .contentManager

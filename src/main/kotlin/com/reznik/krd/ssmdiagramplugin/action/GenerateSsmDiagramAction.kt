@@ -11,83 +11,50 @@ import com.reznik.krd.ssmdiagramplugin.service.SsmBackgroundTaskService
 import com.reznik.krd.ssmdiagramplugin.ui.SsmDiagramService
 
 /**
- * Generates an SSM diagram for the Java configuration selected in the project view.
- *
- * PSI analysis is performed asynchronously outside the EDT.
+ * Запускает построение диаграммы StateMachine из контекстного меню IntelliJ IDEA.
  */
 class GenerateSsmDiagramAction : AnAction() {
 
-    override fun actionPerformed(
-        event: AnActionEvent
-    ) {
+    /**
+     * Запускает анализ выбранного файла и показывает построенную диаграмму.
+     */
+    override fun actionPerformed(event: AnActionEvent) {
+        val project = event.project ?: return
 
-        val project =
-            event.project
-                ?: return
+        val virtualFile = event.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
 
-        val virtualFile =
-            event.getData(
-                CommonDataKeys.VIRTUAL_FILE
-            )
-                ?: return
-
-        val psiFile =
-            PsiManager
-                .getInstance(project)
-                .findFile(virtualFile)
+        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
 
         if (psiFile !is PsiJavaFile) {
-
             Messages.showWarningDialog(
                 project,
                 "Selected file is not a Java file.",
                 DIALOG_TITLE
             )
-
             return
         }
 
-        /*
-         * Show the Tool Window immediately.
-         * The diagram itself will appear when background analysis completes.
-         */
-        ToolWindowManager
-            .getInstance(project)
-            .getToolWindow(TOOL_WINDOW_ID)
-            ?.show()
+        ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID)?.show()
 
-        val backgroundTaskService =
-            SsmBackgroundTaskService(project)
-
+        val backgroundTaskService = SsmBackgroundTaskService(project)
         backgroundTaskService.analyze(
             psiFile = psiFile,
             onSuccess = { model ->
-
                 if (model == null) {
-
                     Messages.showWarningDialog(
                         project,
                         "Spring StateMachine configuration was not found.",
                         DIALOG_TITLE
                     )
-
                     return@analyze
                 }
-
-                SsmDiagramService
-                    .getInstance(project)
-                    .show(model)
+                SsmDiagramService.getInstance(project).show(model)
             },
             onError = { error ->
-
                 Messages.showErrorDialog(
                     project,
                     buildString {
-
-                        append(
-                            "Failed to generate StateMachine diagram."
-                        )
-
+                        append("Failed to generate StateMachine diagram.")
                         error.message
                             ?.takeIf { it.isNotBlank() }
                             ?.let {
@@ -102,11 +69,7 @@ class GenerateSsmDiagramAction : AnAction() {
     }
 
     private companion object {
-
-        const val TOOL_WINDOW_ID =
-            "SSM Diagram"
-
-        const val DIALOG_TITLE =
-            "Spring StateMachine Diagram"
+        const val TOOL_WINDOW_ID = "SSM Diagram"
+        const val DIALOG_TITLE = "Spring StateMachine Diagram"
     }
 }

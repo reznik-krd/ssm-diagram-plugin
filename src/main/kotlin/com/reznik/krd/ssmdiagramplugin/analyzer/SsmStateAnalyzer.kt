@@ -9,41 +9,26 @@ import com.reznik.krd.ssmdiagramplugin.analyzer.expression.ResolvedValue
 import com.reznik.krd.ssmdiagramplugin.model.SsmState
 
 /**
- * Extracts declared initial, normal, choice and end states
- * from a StateMachine configuration.
+ * Извлекает состояния StateMachine из метода настройки состояний.
  */
 class SsmStateAnalyzer {
 
-    private val expressionResolver =
-        ExpressionResolver()
+    private val expressionResolver = ExpressionResolver()
 
     /**
-     * Extracts all states declared by the configuration class.
+     * Анализирует переданный PSI-элемент и возвращает соответствующую модель.
      */
-    fun analyze(
-        configClass: PsiClass
-    ): List<SsmState> {
+    fun analyze(configClass: PsiClass): List<SsmState> {
 
-        val configureMethod =
-            findStatesConfigureMethod(
-                configClass
-            ) ?: return emptyList()
+        val configureMethod = findStatesConfigureMethod(configClass)
+            ?: return emptyList()
 
-        val methodCalls =
-            PsiTreeUtil.findChildrenOfType(
-                configureMethod,
-                PsiMethodCallExpression::class.java
-            )
+        val methodCalls = PsiTreeUtil.findChildrenOfType(configureMethod, PsiMethodCallExpression::class.java)
 
-        val states =
-            linkedMapOf<String, SsmState>()
+        val states = linkedMapOf<String, SsmState>()
 
         methodCalls.forEach { call ->
-
-            when (
-                call.methodExpression.referenceName
-            ) {
-
+            when (call.methodExpression.referenceName) {
                 "initial" ->
                     addStates(
                         call = call,
@@ -58,13 +43,6 @@ class SsmStateAnalyzer {
                         states = states
                     )
 
-                /*
-                 * Important:
-                 *
-                 * .states(Set.of(...))
-                 *
-                 * may produce many states.
-                 */
                 "states" ->
                     addStates(
                         call = call,
@@ -88,60 +66,34 @@ class SsmStateAnalyzer {
             }
         }
 
-        return states.values
-            .toList()
+        return states.values.toList()
     }
 
-    // -------------------------------------------------------------------------
-    // Configure method
-    // -------------------------------------------------------------------------
-
-    private fun findStatesConfigureMethod(
-        configClass: PsiClass
-    ): PsiMethod? {
-
+    /**
+     * Находит метод configure, отвечающий за объявление состояний.
+     */
+    private fun findStatesConfigureMethod(configClass: PsiClass): PsiMethod? {
         return configClass
-            .findMethodsByName(
-                "configure",
-                false
-            )
+            .findMethodsByName("configure", false)
             .firstOrNull { method ->
-
                 method.parameterList
                     .parameters
                     .any { parameter ->
-
                         parameter.type
                             .canonicalText
-                            .contains(
-                                "StateMachineStateConfigurer"
-                            )
+                            .contains("StateMachineStateConfigurer")
                     }
             }
     }
 
-    // -------------------------------------------------------------------------
-    // State extraction
-    // -------------------------------------------------------------------------
-
-    private fun addStates(
-        call: PsiMethodCallExpression,
-        type: SsmState.Type,
-        states: MutableMap<String, SsmState>
-    ) {
-
-        val argument =
-            call.argumentList
-                .expressions
-                .firstOrNull()
-                ?: return
-
-        val resolvedStates =
-            expressionResolver
-                .resolve(argument)
+    /**
+     * Разрешает состояния из аргумента DSL-вызова и добавляет их в результат.
+     */
+    private fun addStates(call: PsiMethodCallExpression, type: SsmState.Type, states: MutableMap<String, SsmState>) {
+        val argument = call.argumentList.expressions.firstOrNull() ?: return
+        val resolvedStates = expressionResolver.resolve(argument)
 
         resolvedStates.forEach { resolved ->
-
             addResolvedState(
                 resolved = resolved,
                 type = type,
@@ -150,14 +102,11 @@ class SsmStateAnalyzer {
         }
     }
 
-    private fun addResolvedState(
-        resolved: ResolvedValue,
-        type: SsmState.Type,
-        states: MutableMap<String, SsmState>
-    ) {
-
-        val existing =
-            states[resolved.name]
+    /**
+     * Добавляет разрешённое состояние с учётом его специального типа.
+     */
+    private fun addResolvedState(resolved: ResolvedValue, type: SsmState.Type, states: MutableMap<String, SsmState>) {
+        val existing = states[resolved.name]
 
         /*
          * INITIAL / CHOICE / END
@@ -172,60 +121,26 @@ class SsmStateAnalyzer {
          * PRE_CLASSIFICATION is first discovered
          * as NORMAL and then upgraded to CHOICE.
          */
-        if (
-            existing == null ||
-            shouldReplace(
-                existing.type,
-                type
-            )
-        ) {
-
+        if (existing == null || shouldReplace(existing.type, type)) {
             states[resolved.name] =
                 SsmState(
                     name = resolved.name,
                     type = type,
-
-                    /*
-                     * Important:
-                     *
-                     * source is PsiEnumConstant,
-                     * not the expression in config.
-                     *
-                     * Clicking the state therefore
-                     * navigates directly to enum.
-                     */
                     source = resolved.source
                 )
         }
     }
 
-    private fun shouldReplace(
-        existingType: SsmState.Type,
-        newType: SsmState.Type
-    ): Boolean {
-
-        if (
-            existingType ==
-            SsmState.Type.NORMAL
-        ) {
+    /**
+     * Определяет, нужно ли заменить ранее найденный тип состояния более точным.
+     */
+    private fun shouldReplace(existingType: SsmState.Type, newType: SsmState.Type): Boolean {
+        if (existingType == SsmState.Type.NORMAL) {
             return true
         }
-
-        /*
-         * Do not downgrade a special state
-         * back to NORMAL.
-         */
-        if (
-            newType ==
-            SsmState.Type.NORMAL
-        ) {
+        if (newType == SsmState.Type.NORMAL) {
             return false
         }
-
-        /*
-         * If two special declarations exist,
-         * the later explicit declaration wins.
-         */
         return true
     }
 }

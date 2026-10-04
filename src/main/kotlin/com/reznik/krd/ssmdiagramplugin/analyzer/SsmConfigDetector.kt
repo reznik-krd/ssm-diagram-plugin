@@ -7,20 +7,20 @@ import com.intellij.psi.util.InheritanceUtil
 import com.reznik.krd.ssmdiagramplugin.model.SsmConfigInfo
 
 /**
- * Detects EnumStateMachineConfigurerAdapter configurations and resolves state/event types.
+ * Определяет, является ли Java-класс поддерживаемой конфигурацией Spring StateMachine.
  */
 class SsmConfigDetector {
 
     companion object {
-        private const val CONFIGURER_CLASS =
-            "org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter"
+        private const val CONFIGURER_CLASS = "org.springframework.statemachine.config.EnumStateMachineConfigurerAdapter"
     }
 
-    /** Returns configuration metadata when the Java file contains a supported SSM config. */
+    /**
+     * Проверяет Java-файл или класс и возвращает данные поддерживаемой StateMachine-конфигурации.
+     */
     fun detect(file: PsiJavaFile): SsmConfigInfo? {
         for (psiClass in file.classes) {
             val result = detect(psiClass)
-
             if (result != null) {
                 return result
             }
@@ -29,6 +29,9 @@ class SsmConfigDetector {
         return null
     }
 
+    /**
+     * Проверяет Java-файл или класс и возвращает данные поддерживаемой StateMachine-конфигурации.
+     */
     private fun detect(psiClass: PsiClass): SsmConfigInfo? {
         if (!InheritanceUtil.isInheritor(psiClass, CONFIGURER_CLASS)) {
             return null
@@ -53,6 +56,9 @@ class SsmConfigDetector {
         )
     }
 
+    /**
+     * Находит тип EnumStateMachineConfigurerAdapter в иерархии класса.
+     */
     private fun findConfigurerType(psiClass: PsiClass): PsiClassType? {
         return psiClass.superTypes
             .filterIsInstance<PsiClassType>()

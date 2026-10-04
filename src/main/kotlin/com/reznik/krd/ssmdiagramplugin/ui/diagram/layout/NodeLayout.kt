@@ -3,7 +3,7 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 import java.awt.Point
 
 /**
- * Bounds and connection points of one laid-out diagram node.
+ * Хранит координаты и размеры узла, а также его точки подключения.
  */
 data class NodeLayout(
     val x: Int,

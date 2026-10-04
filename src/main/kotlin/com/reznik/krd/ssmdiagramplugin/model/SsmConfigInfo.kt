@@ -3,7 +3,7 @@ package com.reznik.krd.ssmdiagramplugin.model
 import com.intellij.psi.PsiClass
 
 /**
- * Metadata for a detected StateMachine configuration class.
+ * Хранит найденный класс StateMachine-конфигурации и типы State/Event.
  */
 data class SsmConfigInfo(
     val configClass: PsiClass,

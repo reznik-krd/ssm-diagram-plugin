@@ -4,76 +4,40 @@ import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 
 /**
- * Resolves supported PSI expressions to semantic state or event values.
+ * Разрешает PSI-выражения состояний и событий в конкретные enum-константы.
  */
 class ExpressionResolver {
 
     /**
-     * Resolves a supported PSI expression into one or more symbolic values.
+     * Разрешает PSI-выражение в модельное значение или ссылку.
      */
-    fun resolve(
-        expression: PsiExpression
-    ): List<ResolvedValue> {
-
+    fun resolve(expression: PsiExpression): List<ResolvedValue> {
         return when (expression) {
-
-            is PsiReferenceExpression ->
-                resolveReference(expression)
-
-            is PsiMethodCallExpression ->
-                resolveMethodCall(expression)
-
-            else ->
-                emptyList()
+            is PsiReferenceExpression -> resolveReference(expression)
+            is PsiMethodCallExpression -> resolveMethodCall(expression)
+            else -> emptyList()
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Reference
-    // -------------------------------------------------------------------------
-
-    private fun resolveReference(
-        expression: PsiReferenceExpression
-    ): List<ResolvedValue> {
-
-        val resolved =
-            expression.resolve()
+    /**
+     * Разрешает ссылочное PSI-выражение.
+     */
+    private fun resolveReference(expression: PsiReferenceExpression): List<ResolvedValue> {
+        val resolved = expression.resolve()
 
         return when (resolved) {
-
-            is PsiEnumConstant ->
-                listOf(
-                    ResolvedValue(
-                        name = resolved.name,
-                        source = resolved
-                    )
-                )
-
-            is PsiLocalVariable ->
-                resolveLocalVariable(
-                    resolved
-                )
-
-            is PsiParameter ->
-                resolveParameter(
-                    resolved
-                )
-
-            else ->
-                emptyList()
+            is PsiEnumConstant -> listOf(ResolvedValue(name = resolved.name, source = resolved))
+            is PsiLocalVariable -> resolveLocalVariable(resolved)
+            is PsiParameter -> resolveParameter(resolved)
+            else -> emptyList()
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Method calls
-    // -------------------------------------------------------------------------
-
-    private fun resolveMethodCall(
-        expression: PsiMethodCallExpression
-    ): List<ResolvedValue> {
-
-        val methodName =
-            expression.methodExpression.referenceName
+    /**
+     * Разрешает поддерживаемый вызов метода, например values() или collection of().
+     */
+    private fun resolveMethodCall(expression: PsiMethodCallExpression): List<ResolvedValue> {
+        val methodName = expression.methodExpression.referenceName
 
         return when (methodName) {
 
@@ -83,8 +47,7 @@ class ExpressionResolver {
              * Resolve qualifier CarState to PsiClass,
              * then return every enum constant.
              */
-            "values" ->
-                resolveEnumValues(expression)
+            "values" -> resolveEnumValues(expression)
 
             /*
              * Set.of(...)
@@ -99,35 +62,17 @@ class ExpressionResolver {
              *
              * becomes all CarState constants.
              */
-            "of" ->
-                expression.argumentList
-                    .expressions
-                    .flatMap(::resolve)
-
-            else ->
-                emptyList()
+            "of" -> expression.argumentList.expressions.flatMap(::resolve)
+            else -> emptyList()
         }
     }
 
     /**
-     * Resolves:
-     *
-     * CarState.values()
-     *
-     * into every enum constant declared inside CarState.
+     * Возвращает все константы enum для вызова values().
      */
-    private fun resolveEnumValues(
-        expression: PsiMethodCallExpression
-    ): List<ResolvedValue> {
-
-        val qualifier =
-            expression.methodExpression.qualifierExpression
-                ?: return emptyList()
-
-        val enumClass =
-            resolveClass(
-                qualifier
-            ) ?: return emptyList()
+    private fun resolveEnumValues(expression: PsiMethodCallExpression): List<ResolvedValue> {
+        val qualifier = expression.methodExpression.qualifierExpression ?: return emptyList()
+        val enumClass = resolveClass(qualifier) ?: return emptyList()
 
         if (!enumClass.isEnum) {
             return emptyList()
@@ -144,91 +89,49 @@ class ExpressionResolver {
     }
 
     /**
-     * Resolves an expression representing a class.
-     *
-     * Example:
-     *
-     * CarState.values()
-     * ^^^^^^^^
+     * Разрешает PSI-тип или выражение до соответствующего класса.
      */
-    private fun resolveClass(
-        expression: PsiExpression
-    ): PsiClass? {
-
+    private fun resolveClass(expression: PsiExpression): PsiClass? {
         return when (expression) {
-
             is PsiReferenceExpression -> {
-
-                when (
-                    val resolved =
-                        expression.resolve()
-                ) {
-
-                    is PsiClass ->
-                        resolved
-
-                    else ->
-                        null
+                when (val resolved = expression.resolve()) {
+                    is PsiClass -> resolved
+                    else -> null
                 }
             }
-
-            else ->
-                null
+            else -> null
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Variables
-    // -------------------------------------------------------------------------
-
-    private fun resolveLocalVariable(
-        variable: PsiLocalVariable
-    ): List<ResolvedValue> {
-
-        val initializer =
-            variable.initializer
-                ?: return emptyList()
-
+    /**
+     * Разрешает локальную переменную через её инициализатор.
+     */
+    private fun resolveLocalVariable(variable: PsiLocalVariable): List<ResolvedValue> {
+        val initializer = variable.initializer ?: return emptyList()
         return resolve(initializer)
     }
 
-    // -------------------------------------------------------------------------
-    // foreach
-    // -------------------------------------------------------------------------
-
-    private fun resolveParameter(
-        parameter: PsiParameter
-    ): List<ResolvedValue> {
-
-        val foreach =
-            PsiTreeUtil.getParentOfType(
+    /**
+     * Разрешает параметр foreach через коллекцию, по которой выполняется цикл.
+     */
+    private fun resolveParameter(parameter: PsiParameter): List<ResolvedValue> {
+        val foreach = PsiTreeUtil.getParentOfType(
                 parameter,
                 PsiForeachStatement::class.java
-            ) ?: return emptyList()
+        ) ?: return emptyList()
 
-        if (
-            foreach.iterationParameter !=
-            parameter
-        ) {
+        if (foreach.iterationParameter != parameter) {
             return emptyList()
         }
 
-        val iteratedValue =
-            foreach.iteratedValue
-                ?: return emptyList()
-
-        return resolveCollection(
-            iteratedValue
-        )
+        val iteratedValue = foreach.iteratedValue ?: return emptyList()
+        return resolveCollection(iteratedValue)
     }
 
-    // -------------------------------------------------------------------------
-    // Collections
-    // -------------------------------------------------------------------------
-
-    private fun resolveCollection(
-        expression: PsiExpression
-    ): List<ResolvedValue> {
+    /**
+     * Разрешает выражение коллекции в набор конкретных значений.
+     */
+    private fun resolveCollection(expression: PsiExpression): List<ResolvedValue> {
 
         /*
          * First try the generic resolver.
@@ -239,9 +142,7 @@ class ExpressionResolver {
          * Set.of(...)
          * CarState.values()
          */
-        val directlyResolved =
-            resolve(expression)
-
+        val directlyResolved = resolve(expression)
         if (directlyResolved.isNotEmpty()) {
             return directlyResolved
         }
@@ -253,24 +154,12 @@ class ExpressionResolver {
          *
          * for (CarState state : states) { ... }
          */
-        if (
-            expression is PsiReferenceExpression
-        ) {
+        if (expression is PsiReferenceExpression) {
+            val resolved = expression.resolve()
 
-            val resolved =
-                expression.resolve()
-
-            if (
-                resolved is PsiLocalVariable
-            ) {
-
-                val initializer =
-                    resolved.initializer
-                        ?: return emptyList()
-
-                return resolveCollection(
-                    initializer
-                )
+            if (resolved is PsiLocalVariable) {
+                val initializer = resolved.initializer ?: return emptyList()
+                return resolveCollection(initializer)
             }
         }
 

@@ -30,52 +30,25 @@ import javax.swing.JPanel
 import kotlin.math.sqrt
 
 /**
- * Swing surface that displays an analyzed Spring StateMachine diagram.
+ * Swing-панель интерактивной диаграммы: отображение, zoom, hit testing, выбор и навигация.
  */
-class SsmDiagramPanel(
-    project: Project
-) : JPanel() {
+class SsmDiagramPanel(project: Project) : JPanel() {
 
-    private val graphBuilder =
-        DiagramGraphBuilder()
+    private val graphBuilder = DiagramGraphBuilder()
+    private val graphTransformer = ReadableGraphTransformer()
+    private val layoutEngine = HierarchicalLayoutEngine()
+    private val interaction = DiagramInteractionState()
+    private val hitRegistry = DiagramHitRegistry()
+    private val navigator = DiagramNavigator(project)
+    private val renderer = DiagramRenderer(interaction, hitRegistry)
 
-    private val graphTransformer =
-        ReadableGraphTransformer()
-
-    private val layoutEngine =
-        HierarchicalLayoutEngine()
-
-    private val interaction =
-        DiagramInteractionState()
-
-    private val hitRegistry =
-        DiagramHitRegistry()
-
-    private val navigator =
-        DiagramNavigator(project)
-
-    private val renderer =
-        DiagramRenderer(
-            interaction,
-            hitRegistry
-        )
-
-    private var graph: DiagramGraph? =
-        null
-
-    private var layout: DiagramLayout? =
-        null
-
-    private var zoom =
-        DEFAULT_ZOOM
-
-    private var zoomChangedListener:
-            ((Double) -> Unit)? = null
+    private var graph: DiagramGraph? = null
+    private var layout: DiagramLayout? = null
+    private var zoom = DEFAULT_ZOOM
+    private var zoomChangedListener: ((Double) -> Unit)? = null
 
     init {
-        background =
-            JBColor.PanelBackground
-
+        background = JBColor.PanelBackground
         installMouseHandlers()
     }
 
@@ -83,36 +56,34 @@ class SsmDiagramPanel(
     // Zoom API
     // -------------------------------------------------------------------------
 
-    fun setZoomChangedListener(
-        listener: (Double) -> Unit
-    ) {
-        zoomChangedListener =
-            listener
-
+    /**
+     * Регистрирует обработчик изменения масштаба.
+     */
+    fun setZoomChangedListener(listener: (Double) -> Unit) {
+        zoomChangedListener = listener
         listener(zoom)
     }
 
-    fun zoomIn() =
-        setZoom(
-            zoom + ZOOM_STEP
-        )
+    /**
+     * Увеличивает масштаб диаграммы.
+     */
+    fun zoomIn() = setZoom(zoom + ZOOM_STEP)
 
-    fun zoomOut() =
-        setZoom(
-            zoom - ZOOM_STEP
-        )
+    /**
+     * Уменьшает масштаб диаграммы.
+     */
+    fun zoomOut() = setZoom(zoom - ZOOM_STEP)
 
-    fun resetZoom() =
-        setZoom(
-            DEFAULT_ZOOM
-        )
+    /**
+     * Возвращает масштаб диаграммы к 100%.
+     */
+    fun resetZoom() = setZoom(DEFAULT_ZOOM)
 
-    fun fitToViewport(
-        viewportSize: Dimension
-    ) {
-
-        val currentLayout =
-            layout ?: return
+    /**
+     * Подбирает масштаб диаграммы под размер viewport.
+     */
+    fun fitToViewport(viewportSize: Dimension) {
+        val currentLayout = layout ?: return
 
         if (
             currentLayout.size.width <= 0 ||
@@ -123,12 +94,7 @@ class SsmDiagramPanel(
             return
         }
 
-        val availableWidth =
-            (
-                    viewportSize.width -
-                            FIT_PADDING
-                    )
-                .coerceAtLeast(1)
+        val availableWidth = (viewportSize.width - FIT_PADDING).coerceAtLeast(1)
 
         val availableHeight =
             (
@@ -157,6 +123,9 @@ class SsmDiagramPanel(
     // Model
     // -------------------------------------------------------------------------
 
+    /**
+     * Строит визуальный граф для модели и обновляет диаграмму.
+     */
     fun setModel(
         model: StateMachineModel
     ) {
@@ -186,6 +155,9 @@ class SsmDiagramPanel(
         repaint()
     }
 
+    /**
+     * Сбрасывает текущее состояние объекта.
+     */
     fun clear() {
 
         graph =
@@ -220,6 +192,9 @@ class SsmDiagramPanel(
     // Painting
     // -------------------------------------------------------------------------
 
+    /**
+     * Отрисовывает текущую диаграмму с учётом масштаба.
+     */
     override fun paintComponent(
         graphics: Graphics
     ) {
@@ -270,6 +245,9 @@ class SsmDiagramPanel(
     // Mouse
     // -------------------------------------------------------------------------
 
+    /**
+     * Подключает обработчики мыши для zoom, hover и кликов.
+     */
     private fun installMouseHandlers() {
 
         addMouseWheelListener { event ->
@@ -325,6 +303,9 @@ class SsmDiagramPanel(
         )
     }
 
+    /**
+     * Определяет интерактивный элемент под курсором и обновляет hover.
+     */
     private fun handleMouseMove(
         event: MouseEvent
     ) {
@@ -450,6 +431,9 @@ class SsmDiagramPanel(
         )
     }
 
+    /**
+     * Обновляет состояние hover и курсор мыши.
+     */
     private fun updateHover(
         nodeId: String? = null,
         eventEdgeId: String? = null,
@@ -488,6 +472,9 @@ class SsmDiagramPanel(
         }
     }
 
+    /**
+     * Сбрасывает состояние hover.
+     */
     private fun clearHover() {
 
         val changed =
@@ -513,6 +500,9 @@ class SsmDiagramPanel(
     // Click
     // -------------------------------------------------------------------------
 
+    /**
+     * Обрабатывает навигацию и выбор элемента по клику.
+     */
     private fun handleMouseClick(
         event: MouseEvent
     ) {
@@ -644,6 +634,9 @@ class SsmDiagramPanel(
     // Selection
     // -------------------------------------------------------------------------
 
+    /**
+     * Выбирает логическое состояние и связанные входящие переходы.
+     */
     private fun selectNode(
         node: DiagramNode
     ) {
@@ -674,6 +667,9 @@ class SsmDiagramPanel(
         repaint()
     }
 
+    /**
+     * Выбирает конкретный переход диаграммы.
+     */
     private fun selectEdge(
         edge: DiagramEdge
     ) {
@@ -701,6 +697,9 @@ class SsmDiagramPanel(
         repaint()
     }
 
+    /**
+     * Сбрасывает выбранное состояние или переход.
+     */
     private fun clearSelection() {
 
         val changed =
@@ -722,6 +721,9 @@ class SsmDiagramPanel(
     // Hit testing
     // -------------------------------------------------------------------------
 
+    /**
+     * Находит узел диаграммы в координатах мыши.
+     */
     private fun findNodeAt(
         mouseX: Int,
         mouseY: Int
@@ -761,6 +763,9 @@ class SsmDiagramPanel(
             }
     }
 
+    /**
+     * Находит кликабельную область action в координатах мыши.
+     */
     private fun findActionAt(
         mouseX: Int,
         mouseY: Int
@@ -783,6 +788,9 @@ class SsmDiagramPanel(
             }
     }
 
+    /**
+     * Находит модель action по зарегистрированной hit-area.
+     */
     private fun findAction(
         area: ActionHitArea
     ): SsmAction? {
@@ -804,6 +812,9 @@ class SsmDiagramPanel(
             )
     }
 
+    /**
+     * Находит переход по области подписи event.
+     */
     private fun findEventEdgeAt(
         mouseX: Int,
         mouseY: Int
@@ -838,6 +849,9 @@ class SsmDiagramPanel(
             }
     }
 
+    /**
+     * Находит переход по области подписи guard.
+     */
     private fun findGuardEdgeAt(
         mouseX: Int,
         mouseY: Int
@@ -872,6 +886,9 @@ class SsmDiagramPanel(
             }
     }
 
+    /**
+     * Находит ребро рядом с указанной точкой диаграммы.
+     */
     private fun findDiagramEdgeAt(
         mouseX: Int,
         mouseY: Int
@@ -934,6 +951,9 @@ class SsmDiagramPanel(
             ?.first
     }
 
+    /**
+     * Вычисляет расстояние от точки до отрезка для hit testing ребра.
+     */
     private fun distanceToSegment(
         px: Double,
         py: Double,
@@ -1032,6 +1052,9 @@ class SsmDiagramPanel(
     // Zoom
     // -------------------------------------------------------------------------
 
+    /**
+     * Устанавливает масштаб в допустимых пределах.
+     */
     private fun setZoom(
         value: Double
     ) {
@@ -1051,6 +1074,9 @@ class SsmDiagramPanel(
             ?.invoke(zoom)
     }
 
+    /**
+     * Пересчитывает размер Swing-панели с учётом масштаба.
+     */
     private fun updatePreferredSize() {
 
         val currentLayout =
@@ -1078,26 +1104,20 @@ class SsmDiagramPanel(
 
     private companion object {
 
-        const val DEFAULT_ZOOM =
-            1.0
+        const val DEFAULT_ZOOM = 1.0
 
-        const val MIN_ZOOM =
-            0.25
+        const val MIN_ZOOM = 0.25
 
-        const val MAX_ZOOM =
-            2.5
+        const val MAX_ZOOM = 2.5
 
-        const val ZOOM_STEP =
-            0.10
+        const val ZOOM_STEP = 0.10
 
-        const val FIT_PADDING =
-            40
+        const val FIT_PADDING = 40
 
         /*
          * Screen-space pixels.
          */
-        const val EDGE_CLICK_TOLERANCE =
-            10.0
+        const val EDGE_CLICK_TOLERANCE = 10.0
 
         val HAND_CURSOR: Cursor =
             Cursor.getPredefinedCursor(

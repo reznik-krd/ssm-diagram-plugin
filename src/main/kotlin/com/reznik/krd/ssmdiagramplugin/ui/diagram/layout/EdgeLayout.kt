@@ -3,7 +3,7 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 import java.awt.Point
 
 /**
- * Polyline and label positions calculated for one diagram edge.
+ * Хранит маршрут ребра и позиции подписей event, guard и actions.
  */
 data class EdgeLayout(
     val points: List<Point>,

@@ -3,7 +3,7 @@ package com.reznik.krd.ssmdiagramplugin.analyzer.expression
 import com.intellij.psi.PsiElement
 
 /**
- * Resolved symbolic value together with the PSI element that produced it.
+ * Хранит разрешённое значение enum и PSI-элемент для последующей навигации в исходный код.
  */
 data class ResolvedValue(
     val name: String,

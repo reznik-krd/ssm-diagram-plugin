@@ -2,16 +2,6 @@
 
 All notable changes to SSM Diagram are documented in this file.
 
-## [Unreleased]
-
-### Added
-- Something
-
-### Fixed
-- Something
-
----
-
 ## [1.0.7] - 2026-10-04
 
 ### Added

@@ -4,17 +4,17 @@ import com.intellij.psi.*
 import com.reznik.krd.ssmdiagramplugin.model.SsmComponentReference
 
 /**
- * Resolves action and guard PSI expressions to navigable component references.
+ * Разрешает PSI-выражение в ссылку на компонент Spring, используемый как guard или action.
  */
 class ComponentReferenceResolver {
 
-    /** Resolves an action or guard expression into a navigable component reference. */
+    /**
+     * Разрешает PSI-выражение в модельное значение или ссылку.
+     */
     fun resolve(expression: PsiExpression): SsmComponentReference {
-
         if (expression is PsiReferenceExpression) {
             return resolveReference(expression)
         }
-
         return SsmComponentReference(
             name = expression.text,
             className = null,
@@ -24,36 +24,19 @@ class ComponentReferenceResolver {
         )
     }
 
-    private fun resolveReference(
-        expression: PsiReferenceExpression
-    ): SsmComponentReference {
-
+    /**
+     * Разрешает ссылочное PSI-выражение.
+     */
+    private fun resolveReference(expression: PsiReferenceExpression): SsmComponentReference {
         val resolved = expression.resolve()
 
         return when (resolved) {
-
-            is PsiField ->
-                resolveVariable(
-                    expression,
-                    resolved
-                )
-
-            is PsiLocalVariable ->
-                resolveVariable(
-                    expression,
-                    resolved
-                )
-
-            is PsiParameter ->
-                resolveVariable(
-                    expression,
-                    resolved
-                )
-
+            is PsiField -> resolveVariable(expression, resolved)
+            is PsiLocalVariable -> resolveVariable(expression, resolved)
+            is PsiParameter -> resolveVariable(expression, resolved)
             else ->
                 SsmComponentReference(
-                    name = expression.referenceName
-                        ?: expression.text,
+                    name = expression.referenceName ?: expression.text,
                     className = null,
                     qualifiedName = null,
                     sourceElement = expression,
@@ -62,11 +45,10 @@ class ComponentReferenceResolver {
         }
     }
 
-    private fun resolveVariable(
-        expression: PsiReferenceExpression,
-        variable: PsiVariable
-    ): SsmComponentReference {
-
+    /**
+     * Разрешает ссылку на переменную через её тип или инициализатор.
+     */
+    private fun resolveVariable(expression: PsiReferenceExpression, variable: PsiVariable): SsmComponentReference {
         val psiClass = resolveClass(variable.type)
 
         return SsmComponentReference(
@@ -78,17 +60,13 @@ class ComponentReferenceResolver {
         )
     }
 
-    private fun resolveClass(
-        type: PsiType
-    ): PsiClass? {
-
+    /**
+     * Разрешает PSI-тип или выражение до соответствующего класса.
+     */
+    private fun resolveClass(type: PsiType): PsiClass? {
         return when (type) {
-
-            is PsiClassType ->
-                type.resolve()
-
-            else ->
-                null
+            is PsiClassType -> type.resolve()
+            else -> null
         }
     }
 }

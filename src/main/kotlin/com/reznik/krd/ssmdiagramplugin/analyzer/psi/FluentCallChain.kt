@@ -4,7 +4,7 @@ import com.intellij.psi.PsiMethodCallExpression
 import com.intellij.psi.PsiReferenceExpression
 
 /**
- * Collects one Spring fluent configuration chain and stops at `.and()` boundary.
+ * Собирает связанную цепочку fluent-вызовов Spring StateMachine DSL.
  */
 internal fun collectFluentChain(start: PsiMethodCallExpression): List<PsiMethodCallExpression> {
     val result = mutableListOf<PsiMethodCallExpression>()
@@ -21,6 +21,8 @@ internal fun collectFluentChain(start: PsiMethodCallExpression): List<PsiMethodC
     return result
 }
 
-/** Returns the first call with the requested method name from a fluent chain. */
+/**
+ * Находит вызов с указанным именем внутри fluent-цепочки.
+ */
 internal fun List<PsiMethodCallExpression>.findCall(name: String): PsiMethodCallExpression? =
     firstOrNull { it.methodExpression.referenceName == name }
