@@ -12,6 +12,13 @@ All notable changes to SSM Diagram are documented in this file.
 
 ---
 
+## [1.0.7] - 2026-10-04
+
+### Added
+- Interactive states selection with incoming transitions
+
+---
+
 ## [1.0.6] - 2026-10-04
 
 ### Added

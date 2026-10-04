@@ -51,17 +51,21 @@ internal class EdgeRenderer(
     ) {
 
         /*
-         * Сначала рисуем обычные edges.
+         * Draw non-selected edges first.
          *
-         * Выбранный edge рисуем последним,
-         * чтобы он оказался поверх остальных линий.
+         * Selected transitions are rendered afterwards,
+         * therefore highlighted paths stay above
+         * normal transition lines.
          */
-        val selectedEdgeId =
-            interaction.selectedEdgeId
-
         graph.edges
-            .filter { it.id != selectedEdgeId }
+            .filterNot {
+                isSelected(
+                    edge = it,
+                    graph = graph
+                )
+            }
             .forEach { edge ->
+
                 drawEdge(
                     g2 = g2,
                     edge = edge,
@@ -71,23 +75,27 @@ internal class EdgeRenderer(
             }
 
         /*
-         * Selected edge поверх остальных.
+         * There may now be several selected edges:
+         *
+         * A ──► READY
+         * B ──► READY
+         * C ──► READY
          */
-        selectedEdgeId
-            ?.let { edgeId ->
+        graph.edges
+            .filter {
+                isSelected(
+                    edge = it,
+                    graph = graph
+                )
+            }
+            .forEach { edge ->
 
-                graph.edges
-                    .firstOrNull {
-                        it.id == edgeId
-                    }
-                    ?.let { edge ->
-                        drawEdge(
-                            g2 = g2,
-                            edge = edge,
-                            layout = layout,
-                            selected = true
-                        )
-                    }
+                drawEdge(
+                    g2 = g2,
+                    edge = edge,
+                    layout = layout,
+                    selected = true
+                )
             }
     }
 
@@ -817,5 +825,38 @@ internal class EdgeRenderer(
                 Color(225, 235, 250),
                 Color(65, 75, 90)
             )
+    }
+
+    private fun isSelected(
+        edge: DiagramEdge,
+        graph: DiagramGraph
+    ): Boolean {
+
+        /*
+         * Explicit transition selection.
+         */
+        if (
+            edge.id ==
+            interaction.selectedEdgeId
+        ) {
+            return true
+        }
+
+        /*
+         * State selection:
+         *
+         * highlight every transition whose target
+         * belongs to the selected logical state.
+         */
+        val selectedLogicalId =
+            interaction.selectedNodeLogicalId
+                ?: return false
+
+        val targetNode =
+            graph.node(edge.target)
+                ?: return false
+
+        return targetNode.logicalId ==
+                selectedLogicalId
     }
 }

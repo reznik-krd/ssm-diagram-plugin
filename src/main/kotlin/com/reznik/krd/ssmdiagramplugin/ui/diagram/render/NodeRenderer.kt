@@ -24,15 +24,26 @@ internal class NodeRenderer(
         layout: DiagramLayout
     ) {
 
+        /*
+         * Concrete edge selected by clicking a transition.
+         */
         val selectedEdge =
             interaction.selectedEdgeId
                 ?.let { selectedEdgeId ->
                     graph.edges
                         .firstOrNull {
-                            it.id ==
-                                    selectedEdgeId
+                            it.id == selectedEdgeId
                         }
                 }
+
+        /*
+         * Logical state selected by clicking a state.
+         *
+         * logicalId is used because ReadableGraphTransformer
+         * may create several visual copies of one logical state.
+         */
+        val selectedNodeLogicalId =
+            interaction.selectedNodeLogicalId
 
         graph.nodes.forEach { node ->
 
@@ -47,16 +58,25 @@ internal class NodeRenderer(
                 )
 
             /*
-             * Source and target of selected edge.
+             * State was explicitly selected.
              */
-            val selectedEndpoint =
+            val selectedByNode =
+                selectedNodeLogicalId != null &&
+                        node.logicalId == selectedNodeLogicalId
+
+            /*
+             * Node is source/target of explicitly selected edge.
+             */
+            val selectedByEdge =
                 selectedEdge != null &&
                         (
-                                node.id ==
-                                        selectedEdge.source ||
-                                        node.id ==
-                                        selectedEdge.target
+                                node.id == selectedEdge.source ||
+                                        node.id == selectedEdge.target
                                 )
+
+            val selected =
+                selectedByNode ||
+                        selectedByEdge
 
             when (node.type) {
 
@@ -66,7 +86,7 @@ internal class NodeRenderer(
                         position = position,
                         width = nodeLayout.width,
                         height = nodeLayout.height,
-                        selected = selectedEndpoint
+                        selected = selected
                     )
 
                 DiagramNode.Type.END_MARKER ->
@@ -75,7 +95,7 @@ internal class NodeRenderer(
                         position = position,
                         width = nodeLayout.width,
                         height = nodeLayout.height,
-                        selected = selectedEndpoint
+                        selected = selected
                     )
 
                 DiagramNode.Type.CHOICE ->
@@ -85,7 +105,7 @@ internal class NodeRenderer(
                         position = position,
                         width = nodeLayout.width,
                         height = nodeLayout.height,
-                        selected = selectedEndpoint
+                        selected = selected
                     )
 
                 DiagramNode.Type.STATE ->
@@ -95,7 +115,7 @@ internal class NodeRenderer(
                         position = position,
                         width = nodeLayout.width,
                         height = nodeLayout.height,
-                        selected = selectedEndpoint
+                        selected = selected
                     )
             }
         }
@@ -115,12 +135,8 @@ internal class NodeRenderer(
     ) {
 
         val hovered =
-            node.id ==
-                    interaction.hoveredNodeId
+            node.id == interaction.hoveredNodeId
 
-        /*
-         * Background.
-         */
         g2.color =
             when {
 
@@ -143,9 +159,6 @@ internal class NodeRenderer(
             14
         )
 
-        /*
-         * Border.
-         */
         g2.color =
             when {
 
@@ -183,9 +196,6 @@ internal class NodeRenderer(
             14
         )
 
-        /*
-         * Label.
-         */
         val oldFont =
             g2.font
 
@@ -202,9 +212,7 @@ internal class NodeRenderer(
             position.x +
                     (
                             width -
-                                    metrics.stringWidth(
-                                        node.label
-                                    )
+                                    metrics.stringWidth(node.label)
                             ) / 2
 
         val textY =
@@ -273,12 +281,8 @@ internal class NodeRenderer(
             )
 
         val hovered =
-            node.id ==
-                    interaction.hoveredNodeId
+            node.id == interaction.hoveredNodeId
 
-        /*
-         * Background.
-         */
         g2.color =
             when {
 
@@ -298,9 +302,6 @@ internal class NodeRenderer(
             4
         )
 
-        /*
-         * Border.
-         */
         g2.color =
             when {
 
@@ -335,9 +336,6 @@ internal class NodeRenderer(
             4
         )
 
-        /*
-         * Choice name.
-         */
         g2.color =
             if (selected) {
                 SELECTED_TEXT_COLOR
@@ -462,7 +460,7 @@ internal class NodeRenderer(
     }
 
     // -------------------------------------------------------------------------
-    // Colors
+    // Style
     // -------------------------------------------------------------------------
 
     private companion object {

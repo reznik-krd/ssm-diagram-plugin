@@ -9,20 +9,31 @@ class DiagramInteractionState {
     var hoveredGuardEdgeId: String? = null
     var hoveredAction: ActionKey? = null
 
+    /**
+     * Concrete selected transition.
+     */
     var selectedEdgeId: String? = null
 
-    /** Clears all hover selections. */
+    /**
+     * Logical state selected by the user.
+     *
+     * We store logicalId instead of node.id because one logical state
+     * may have several visual copies in the diagram.
+     */
+    var selectedNodeLogicalId: String? = null
+
     fun clear() {
         clearHover()
         selectedEdgeId = null
+        selectedNodeLogicalId = null
     }
 
     /** Returns true when at least one diagram element is highlighted. */
     fun hasHover(): Boolean =
         hoveredNodeId != null ||
-            hoveredEventEdgeId != null ||
-            hoveredGuardEdgeId != null ||
-            hoveredAction != null
+                hoveredEventEdgeId != null ||
+                hoveredGuardEdgeId != null ||
+                hoveredAction != null
 
     fun clearHover() {
         hoveredNodeId = null
