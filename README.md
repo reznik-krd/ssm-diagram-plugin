@@ -1,36 +1,36 @@
 # Spring StateMachine Diagram Plugin
 
-An IntelliJ IDEA plugin for visualizing Spring StateMachine
-configurations as interactive diagrams directly inside the IDE.
+Плагин для IntelliJ IDEA, который визуализирует конфигурации Spring
+StateMachine в виде интерактивной диаграммы прямо в IDE.
 
-The plugin analyzes your Java StateMachine configuration and builds a
-state/transition diagram without starting the Spring application.
+Плагин анализирует Java-конфигурацию StateMachine и строит схему
+состояний и переходов без запуска Spring-приложения.
 
-## Features
+## Возможности
 
--   Automatic discovery of Spring StateMachine configurations.
--   State and transition diagrams.
--   Visualization of states, initial / end states and choice states.
--   Visualization of events, guards and actions.
--   Navigation from diagram elements to source code.
--   Navigation to the selected StateMachine configuration.
--   State and transition highlighting.
--   Zoom, Fit and Center controls for large diagrams.
--   Multiple StateMachine configurations in one project.
+-   Автоматический поиск Spring StateMachine конфигураций в проекте.
+-   Построение диаграммы состояний и переходов.
+-   Отображение состояний, initial / end states и choice states.
+-   Отображение events, guards и actions.
+-   Навигация из элементов диаграммы в исходный код.
+-   Навигация к выбранной StateMachine конфигурации.
+-   Подсветка выбранных состояний и переходов.
+-   Zoom, Fit и Center для больших диаграмм.
+-   Поддержка нескольких StateMachine конфигураций в одном проекте.
 
-## Requirements
+## Требования
 
 -   IntelliJ IDEA 2025.3+
--   Java project
+-   Java-проект
 -   Spring StateMachine
--   The project must be indexed by IntelliJ IDEA.
--   StateMachine configuration extending:
+-   Проект должен быть проиндексирован IntelliJ IDEA
+-   Конфигурация должна наследоваться от:
 
 ``` java
 EnumStateMachineConfigurerAdapter<State, Event>
 ```
 
-Example:
+Например:
 
 ``` java
 @Configuration
@@ -40,25 +40,29 @@ public class CarStateMachineConfig
 }
 ```
 
-The plugin uses IntelliJ PSI to analyze source code and does not require
-starting the Spring Application Context.
+Плагин анализирует исходный код через IntelliJ PSI и не требует запуска
+Spring Application Context.
 
-## Installation
+## Установка
 
-1.  Build or download the plugin ZIP archive.
-2.  Open IntelliJ IDEA.
-3.  Go to `Settings → Plugins → ⚙ → Install Plugin from Disk...`.
-4.  Select the plugin ZIP archive.
-5.  Restart IntelliJ IDEA if required.
+1.  Соберите или скачайте ZIP-архив плагина.
+2.  Откройте IntelliJ IDEA.
+3.  Перейдите в `Settings → Plugins → ⚙ → Install Plugin from Disk...`.
+4.  Выберите ZIP-архив плагина.
+5.  Перезапустите IntelliJ IDEA при необходимости.
 
-After installation open `View → Tool Windows → SSM Diagram`.
+После установки откройте `View → Tool Windows → SSM Diagram`.
 
-Select a StateMachine configuration and click **Generate**.
+Выберите StateMachine конфигурацию и нажмите **Generate**.
 
-## How it works
+## Как это работает
 
-The plugin analyzes the StateMachine configuration using IntelliJ PSI:
+Плагин анализирует StateMachine конфигурацию через IntelliJ PSI:
 
 `StateMachine Config → PSI Analysis → StateMachine Model → Diagram Graph → Interactive Diagram`
 
-The Spring application is not started.
+Spring-приложение при этом не запускается.
+
+## Архитектура плагина SSM Diagram
+
+![Архитектура плагина SSM Diagram](Архитектура плагина SSM Diagram.png)
