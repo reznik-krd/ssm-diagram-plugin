@@ -2,6 +2,7 @@ package com.reznik.krd.ssmdiagramplugin.analyzer.expression
 
 import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.util.PsiUtil
 
 /**
  * Разрешает PSI-выражения состояний и событий в конкретные enum-константы.
@@ -52,6 +53,7 @@ class ExpressionResolver {
             /*
              * Set.of(...)
              * List.of(...)
+             * EnumSet.allOf(...)
              *
              * Each argument may itself resolve into
              * one or several values.
@@ -63,6 +65,7 @@ class ExpressionResolver {
              * becomes all CarState constants.
              */
             "of" -> expression.argumentList.expressions.flatMap(::resolve)
+            "allOf" -> resolveEnumAllOf(expression)
             else -> emptyList()
         }
     }
@@ -73,6 +76,36 @@ class ExpressionResolver {
     private fun resolveEnumValues(expression: PsiMethodCallExpression): List<ResolvedValue> {
         val qualifier = expression.methodExpression.qualifierExpression ?: return emptyList()
         val enumClass = resolveClass(qualifier) ?: return emptyList()
+
+        if (!enumClass.isEnum) {
+            return emptyList()
+        }
+
+        return enumClass.fields
+            .filterIsInstance<PsiEnumConstant>()
+            .map { constant ->
+                ResolvedValue(
+                    name = constant.name,
+                    source = constant
+                )
+            }
+    }
+
+    /**
+     * Возвращает все enum-константы из EnumSet.allOf(CarState.class).
+     */
+    private fun resolveEnumAllOf(
+        expression: PsiMethodCallExpression
+    ): List<ResolvedValue> {
+
+        val argument = expression.argumentList
+            .expressions
+            .firstOrNull() as? PsiClassObjectAccessExpression
+            ?: return emptyList()
+
+        val enumClass = PsiUtil.resolveClassInClassTypeOnly(
+            argument.operand.type
+        ) ?: return emptyList()
 
         if (!enumClass.isEnum) {
             return emptyList()

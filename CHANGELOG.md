@@ -2,6 +2,14 @@
 
 All notable changes to SSM Diagram are documented in this file.
 
+
+## [1.0.10] - 2026-10-26
+
+### Added
+- Support for Spring StateMachine states declared with `states(EnumSet.allOf(CarState.class)`.
+- icons
+- description
+
 ## [1.0.7] - 2026-10-04
 
 ### Added

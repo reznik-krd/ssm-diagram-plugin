@@ -1,7 +1,43 @@
 <idea-plugin>
     <id>com.reznik.krd.ssm-diagram-plugin</id>
-    <name>Ssm-diagram-plugin</name>
-    <vendor url="https://www.yourcompany.com">Reznik N.A.</vendor>
+    <name>SSM Diagram</name>
+    <vendor>Reznik N.A.</vendor>
+
+    <description><![CDATA[
+    <h2>Spring StateMachine Diagram</h2>
+    <p>
+        Плагин для визуализации конфигураций Spring StateMachine
+        в виде интерактивных диаграмм прямо в IntelliJ IDEA.
+    </p>
+    <h3>Возможности</h3>
+    <ul>
+        <li>Автоматический поиск конфигураций Spring StateMachine в проекте.</li>
+        <li>Построение диаграмм состояний и переходов.</li>
+        <li>Отображение событий (Events), условий (Guards), действий (Actions) и Choice-переходов.</li>
+        <li>Навигация из элементов диаграммы непосредственно в исходный Java-код.</li>
+        <li>Подсветка выбранных состояний и входящих переходов.</li>
+        <li>Масштабирование, центрирование и подгонка диаграммы под размер окна.</li>
+        <li>Работа с несколькими конфигурациями StateMachine в одном проекте.</li>
+    </ul>
+
+    <h3>Как пользоваться</h3>
+    <ol>
+        <li>Откройте Java-проект со Spring StateMachine.</li>
+        <li>Перейдите в View → Tool Windows → SSM Diagram.</li>
+        <li>Выберите нужную конфигурацию из списка.</li>
+        <li>Нажмите Generate для построения диаграммы.</li>
+        <li>Нажимайте на состояния, события, условия и действия для перехода к исходному коду.</li>
+    </ol>
+
+    <h3>Требования и особенности</h3>
+    <ul>
+        <li>IntelliJ IDEA 2025.3 и новее.</li>
+        <li>Конфигурация должна наследоваться от EnumStateMachineConfigurerAdapter.</li>
+        <li>Анализ выполняется через IntelliJ PSI без запуска Spring-приложения.</li>
+        <li>Проект должен быть проиндексирован IntelliJ.</li>
+    </ul>
+]]></description>
+
     <depends>com.intellij.java</depends>
     <resource-bundle>messages.MyMessageBundle</resource-bundle>
     <extensions defaultExtensionNs="com.intellij">
@@ -9,7 +45,7 @@
                 id="SSM Diagram"
                 factoryClass="com.reznik.krd.ssmdiagramplugin.ui.SsmDiagramToolWindowFactory"
                 anchor="right"
-                icon="AllIcons.Toolwindows.ToolWindowPalette"/>
+                icon="/icons/ssmToolWindow.svg"/>
     </extensions>
 
     <actions>
