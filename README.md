@@ -65,4 +65,4 @@ Spring-приложение при этом не запускается.
 
 ## Архитектура плагина SSM Diagram
 
-![Архитектура плагина SSM Diagram](Архитектура плагина SSM Diagram.png)
+![Архитектура плагина SSM Diagram](scheme.png)
