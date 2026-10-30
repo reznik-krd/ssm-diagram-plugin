@@ -2,6 +2,11 @@
 
 All notable changes to SSM Diagram are documented in this file.
 
+## [1.0.11] - 2026-10-30
+
+### Added
+- Zoom control has been added using the mouse wheel.
+- Movement along the diagram has been added via the space + left mouse button.
 
 ## [1.0.10] - 2026-10-26
 

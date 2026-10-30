@@ -148,9 +148,9 @@ internal class EdgeRenderer(
 
         g2.color =
             if (selected) {
-                SELECTED_COLOR
+                DiagramColors.SELECTED_BORDER
             } else {
-                JBColor.GRAY
+                DiagramColors.EDGE
             }
 
         /*
@@ -406,7 +406,7 @@ internal class EdgeRenderer(
             when {
 
                 selected ->
-                    SELECTED_LABEL_BACKGROUND
+                    DiagramColors.SELECTED_LABEL_BACKGROUND
 
                 hovered ->
                     HOVER_BACKGROUND
@@ -434,7 +434,7 @@ internal class EdgeRenderer(
 
             g2.color =
                 if (selected) {
-                    SELECTED_COLOR
+                    DiagramColors.SELECTED_BORDER
                 } else {
                     JBColor.GRAY
                 }
@@ -465,7 +465,7 @@ internal class EdgeRenderer(
             when {
 
                 selected ->
-                    SELECTED_TEXT_COLOR
+                    DiagramColors.SELECTED_TEXT
 
                 hovered ->
                     JBColor.foreground()
@@ -627,7 +627,7 @@ internal class EdgeRenderer(
             when {
 
                 selected ->
-                    SELECTED_LABEL_BACKGROUND
+                    DiagramColors.SELECTED_LABEL_BACKGROUND
 
                 hovered ->
                     HOVER_BACKGROUND
@@ -655,7 +655,7 @@ internal class EdgeRenderer(
 
             g2.color =
                 if (selected) {
-                    SELECTED_COLOR
+                    DiagramColors.SELECTED_BORDER
                 } else {
                     JBColor.GRAY
                 }
@@ -686,7 +686,7 @@ internal class EdgeRenderer(
             when {
 
                 selected ->
-                    SELECTED_TEXT_COLOR
+                    DiagramColors.SELECTED_TEXT
 
                 kind == LabelKind.EVENT ->
                     JBColor.foreground()
@@ -819,27 +819,6 @@ internal class EdgeRenderer(
 
         const val SELECTED_EDGE_WIDTH =
             3.2f
-
-        /*
-         * Light / dark theme aware accent.
-         */
-        val SELECTED_COLOR =
-            JBColor(
-                Color(45, 125, 220),
-                Color(90, 165, 255)
-            )
-
-        val SELECTED_LABEL_BACKGROUND =
-            JBColor(
-                Color(225, 238, 252),
-                Color(48, 65, 82)
-            )
-
-        val SELECTED_TEXT_COLOR =
-            JBColor(
-                Color(25, 80, 150),
-                Color(150, 205, 255)
-            )
 
         val HOVER_BACKGROUND =
             JBColor(

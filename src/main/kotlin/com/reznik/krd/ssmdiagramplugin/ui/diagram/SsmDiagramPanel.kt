@@ -28,6 +28,13 @@ import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.JPanel
 import kotlin.math.sqrt
+import javax.swing.JViewport
+import javax.swing.SwingUtilities
+import kotlin.math.pow
+import java.awt.KeyboardFocusManager
+import java.awt.KeyEventDispatcher
+import java.awt.event.KeyEvent
+import java.awt.event.InputEvent
 
 /**
  * Swing-панель интерактивной диаграммы: отображение, zoom, hit testing, выбор и навигация.
@@ -47,9 +54,76 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private var zoom = DEFAULT_ZOOM
     private var zoomChangedListener: ((Double) -> Unit)? = null
 
+    private var spacePressed = false
+    private var panning = false
+
+    private var lastDragScreenPoint: Point? = null
+    private var dragDistance = 0
+
+    private val panCursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
+
+    private val spaceKeyDispatcher = KeyEventDispatcher { event ->
+        val isSpaceEvent = when (event.id) {
+            KeyEvent.KEY_TYPED -> event.keyChar == ' '
+            else -> event.keyCode == KeyEvent.VK_SPACE
+        }
+
+        if (!isSpaceEvent) {
+            return@KeyEventDispatcher false
+        }
+
+        val diagramWindow = SwingUtilities.getWindowAncestor(this)
+        val activeWindow = KeyboardFocusManager
+            .getCurrentKeyboardFocusManager()
+            .activeWindow
+
+        if (diagramWindow == null || diagramWindow != activeWindow) {
+            return@KeyEventDispatcher false
+        }
+
+        when (event.id) {
+            KeyEvent.KEY_PRESSED -> {
+                if (spacePressed) {
+                    return@KeyEventDispatcher true
+                }
+
+                // Перехватываем Space только когда курсор над диаграммой.
+                if (mousePosition == null || layout == null) {
+                    return@KeyEventDispatcher false
+                }
+
+// Забираем фокус у редактора кода.
+                requestFocusInWindow()
+
+                spacePressed = true
+                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+
+// Не пропускаем событие дальше в IntelliJ Editor.
+                true
+            }
+            KeyEvent.KEY_TYPED -> {
+                spacePressed && event.keyChar == ' '
+            }
+
+            KeyEvent.KEY_RELEASED -> {
+                if (!spacePressed) {
+                    return@KeyEventDispatcher false
+                }
+
+                spacePressed = false
+                stopPanning()
+                cursor = Cursor.getDefaultCursor()
+                true
+            }
+
+            else -> false
+        }
+    }
+
     init {
         background = JBColor.PanelBackground
         installMouseHandlers()
+        isFocusable = true
     }
 
     // -------------------------------------------------------------------------
@@ -160,6 +234,10 @@ class SsmDiagramPanel(project: Project) : JPanel() {
      */
     fun clear() {
 
+        spacePressed = false
+        stopPanning()
+        dragDistance = 0
+
         graph =
             null
 
@@ -252,33 +330,79 @@ class SsmDiagramPanel(project: Project) : JPanel() {
 
         addMouseWheelListener { event ->
 
-            if (
-                !event.isControlDown &&
-                !event.isMetaDown
-            ) {
+            if (layout == null || event.preciseWheelRotation == 0.0) {
                 return@addMouseWheelListener
             }
 
             event.consume()
 
-            if (
-                event.wheelRotation < 0
-            ) {
-                zoomIn()
-            } else {
-                zoomOut()
+            val viewport = SwingUtilities.getAncestorOfClass(
+                JViewport::class.java,
+                this
+            ) as? JViewport
+
+            val previousZoom = zoom
+
+            val rotation = event.preciseWheelRotation
+
+            val multiplier = (1.0 + ZOOM_STEP).pow(-rotation)
+
+            val requestedZoom = (zoom * multiplier)
+                .coerceIn(MIN_ZOOM, MAX_ZOOM)
+
+            if (requestedZoom == previousZoom) {
+                return@addMouseWheelListener
+            }
+
+            // Координаты мыши относительно самой диаграммы.
+            val anchor = event.point
+
+            val previousViewPosition =
+                viewport?.viewPosition ?: Point(0, 0)
+
+            setZoom(requestedZoom)
+
+            if (viewport != null) {
+
+                val ratio = zoom / previousZoom
+
+                // Сохраняем точку диаграммы под курсором.
+                val newX = (
+                        anchor.x * ratio -
+                                (anchor.x - previousViewPosition.x)
+                        ).toInt()
+
+                val newY = (
+                        anchor.y * ratio -
+                                (anchor.y - previousViewPosition.y)
+                        ).toInt()
+
+                val extent = viewport.extentSize
+                val size = preferredSize
+
+                viewport.viewPosition = Point(
+                    newX.coerceIn(
+                        0,
+                        (size.width - extent.width).coerceAtLeast(0)
+                    ),
+                    newY.coerceIn(
+                        0,
+                        (size.height - extent.height).coerceAtLeast(0)
+                    )
+                )
             }
         }
 
         addMouseListener(
             object : MouseAdapter() {
 
-                override fun mouseClicked(
-                    event: MouseEvent
-                ) {
-                    handleMouseClick(
-                        event
-                    )
+                override fun mouseClicked(event: MouseEvent) {
+                    if (spacePressed || dragDistance > 4) {
+                        dragDistance = 0
+                        return
+                    }
+
+                    handleMouseClick(event)
                 }
 
                 override fun mouseExited(
@@ -286,18 +410,37 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                 ) {
                     clearHover()
                 }
+
+                override fun mousePressed(event: MouseEvent) {
+                    requestFocusInWindow()
+                    if (spacePressed) {
+                        startPanning(event)
+                    }
+                }
+
+                override fun mouseReleased(event: MouseEvent) {
+                    if (panning) {
+                        stopPanning()
+                    }
+                }
             }
         )
 
         addMouseMotionListener(
             object : MouseMotionAdapter() {
 
-                override fun mouseMoved(
-                    event: MouseEvent
-                ) {
-                    handleMouseMove(
-                        event
-                    )
+                override fun mouseMoved(event: MouseEvent) {
+                    if (spacePressed || panning) {
+                        return
+                    }
+
+                    handleMouseMove(event)
+                }
+
+                override fun mouseDragged(event: MouseEvent) {
+                    if (panning) {
+                        handlePanning(event)
+                    }
                 }
             }
         )
@@ -441,6 +584,9 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         action: ActionKey? = null,
         clickable: Boolean = true
     ) {
+        if (spacePressed || panning) {
+            return
+        }
 
         val changed =
             interaction.hoveredNodeId != nodeId ||
@@ -476,6 +622,9 @@ class SsmDiagramPanel(project: Project) : JPanel() {
      * Сбрасывает состояние hover.
      */
     private fun clearHover() {
+        if (spacePressed || panning) {
+            return
+        }
 
         val changed =
             interaction.hasHover()
@@ -1096,6 +1245,89 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                         )
                     .toInt()
             )
+    }
+
+    override fun addNotify() {
+        super.addNotify()
+
+        KeyboardFocusManager
+            .getCurrentKeyboardFocusManager()
+            .addKeyEventDispatcher(spaceKeyDispatcher)
+    }
+
+    override fun removeNotify() {
+        KeyboardFocusManager
+            .getCurrentKeyboardFocusManager()
+            .removeKeyEventDispatcher(spaceKeyDispatcher)
+
+        spacePressed = false
+        stopPanning()
+
+        super.removeNotify()
+    }
+
+    private fun startPanning(event: MouseEvent) {
+        if (!spacePressed || layout == null) {
+            return
+        }
+
+        if (event.button != MouseEvent.BUTTON1) {
+            return
+        }
+
+        panning = true
+        dragDistance = 0
+        lastDragScreenPoint = event.locationOnScreen
+
+        cursor = panCursor
+    }
+
+    private fun handlePanning(event: MouseEvent) {
+        if (!panning) {
+            return
+        }
+
+        val viewport = SwingUtilities.getAncestorOfClass(
+            JViewport::class.java,
+            this
+        ) as? JViewport ?: return
+
+        val previousPoint = lastDragScreenPoint ?: return
+        val currentPoint = event.locationOnScreen
+
+        val dx = currentPoint.x - previousPoint.x
+        val dy = currentPoint.y - previousPoint.y
+
+        if (dx == 0 && dy == 0) {
+            return
+        }
+
+        dragDistance += kotlin.math.abs(dx) + kotlin.math.abs(dy)
+
+        val currentPosition = viewport.viewPosition
+        val extent = viewport.extentSize
+        val viewSize = viewport.viewSize
+
+        val maxX = (viewSize.width - extent.width).coerceAtLeast(0)
+        val maxY = (viewSize.height - extent.height).coerceAtLeast(0)
+
+        viewport.viewPosition = Point(
+            (currentPosition.x - dx).coerceIn(0, maxX),
+            (currentPosition.y - dy).coerceIn(0, maxY)
+        )
+
+        lastDragScreenPoint = currentPoint
+    }
+
+    private fun stopPanning() {
+        panning = false
+        lastDragScreenPoint = null
+
+        cursor = if (spacePressed) {
+            Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        } else {
+            Cursor.getDefaultCursor()
+        }
     }
 
     // -------------------------------------------------------------------------

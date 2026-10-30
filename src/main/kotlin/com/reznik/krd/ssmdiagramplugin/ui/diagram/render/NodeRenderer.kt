@@ -143,18 +143,7 @@ internal class NodeRenderer(
         val hovered =
             node.id == interaction.hoveredNodeId
 
-        g2.color =
-            when {
-
-                selected ->
-                    SELECTED_BACKGROUND
-
-                hovered ->
-                    HOVER_BACKGROUND
-
-                else ->
-                    JBColor.PanelBackground
-            }
+        g2.color = DiagramColors.STATE_BACKGROUND
 
         g2.fillRoundRect(
             position.x,
@@ -165,18 +154,11 @@ internal class NodeRenderer(
             14
         )
 
-        g2.color =
-            when {
-
-                selected ->
-                    SELECTED_COLOR
-
-                hovered ->
-                    JBColor.foreground()
-
-                else ->
-                    JBColor.GRAY
-            }
+        g2.color = when {
+            selected -> DiagramColors.SELECTED_BORDER
+            hovered -> DiagramColors.STATE_HOVER_BORDER
+            else -> DiagramColors.STATE_BORDER
+        }
 
         g2.stroke =
             BasicStroke(
@@ -229,12 +211,7 @@ internal class NodeRenderer(
                             ) / 2 +
                     metrics.ascent
 
-        g2.color =
-            if (selected) {
-                SELECTED_TEXT_COLOR
-            } else {
-                JBColor.foreground()
-            }
+        g2.color = DiagramColors.STATE_TEXT
 
         g2.drawString(
             node.label,
@@ -292,18 +269,7 @@ internal class NodeRenderer(
         val hovered =
             node.id == interaction.hoveredNodeId
 
-        g2.color =
-            when {
-
-                selected ->
-                    SELECTED_BACKGROUND
-
-                hovered ->
-                    HOVER_BACKGROUND
-
-                else ->
-                    JBColor.PanelBackground
-            }
+        g2.color = DiagramColors.CHOICE_BACKGROUND
 
         g2.fillPolygon(
             xPoints,
@@ -311,18 +277,11 @@ internal class NodeRenderer(
             4
         )
 
-        g2.color =
-            when {
-
-                selected ->
-                    SELECTED_COLOR
-
-                hovered ->
-                    JBColor.foreground()
-
-                else ->
-                    JBColor.GRAY
-            }
+        g2.color = when {
+            selected -> DiagramColors.SELECTED_BORDER
+            hovered -> DiagramColors.CHOICE_HOVER_BORDER
+            else -> DiagramColors.CHOICE_BORDER
+        }
 
         g2.stroke =
             BasicStroke(
@@ -345,12 +304,7 @@ internal class NodeRenderer(
             4
         )
 
-        g2.color =
-            if (selected) {
-                SELECTED_TEXT_COLOR
-            } else {
-                JBColor.foreground()
-            }
+        g2.color = DiagramColors.CHOICE_TEXT
 
         g2.drawString(
             node.label,
@@ -393,7 +347,7 @@ internal class NodeRenderer(
 
         g2.color =
             if (selected) {
-                SELECTED_COLOR
+                DiagramColors.SELECTED_BORDER
             } else {
                 JBColor.foreground()
             }
@@ -445,7 +399,7 @@ internal class NodeRenderer(
 
         g2.color =
             if (selected) {
-                SELECTED_COLOR
+                DiagramColors.SELECTED_BORDER
             } else {
                 JBColor.foreground()
             }
@@ -488,29 +442,5 @@ internal class NodeRenderer(
 
         const val SELECTED_NODE_WIDTH =
             3.0f
-
-        val SELECTED_COLOR =
-            JBColor(
-                Color(45, 125, 220),
-                Color(90, 165, 255)
-            )
-
-        val SELECTED_BACKGROUND =
-            JBColor(
-                Color(225, 238, 252),
-                Color(48, 65, 82)
-            )
-
-        val SELECTED_TEXT_COLOR =
-            JBColor(
-                Color(25, 80, 150),
-                Color(150, 205, 255)
-            )
-
-        val HOVER_BACKGROUND =
-            JBColor(
-                Color(235, 242, 252),
-                Color(55, 65, 78)
-            )
     }
 }
