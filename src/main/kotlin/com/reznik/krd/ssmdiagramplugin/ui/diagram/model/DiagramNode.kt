@@ -14,6 +14,7 @@ data class DiagramNode(
     val visualCopy: Boolean = false
 ) {
 
+    /** Допустимые разновидности элемента модели. */
     enum class Type {
         INITIAL_MARKER,
         STATE,

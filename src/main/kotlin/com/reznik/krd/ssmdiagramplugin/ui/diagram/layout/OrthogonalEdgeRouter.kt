@@ -146,11 +146,9 @@ class OrthogonalEdgeRouter {
          *
          * An edge naturally starts/ends on them.
          */
-        val obstacles =
-            nodes
+        val obstacles = nodes
                 .filterKeys { nodeId ->
-                    nodeId != edge.source &&
-                            nodeId != edge.target
+                    nodeId != edge.source && nodeId != edge.target
                 }
                 .values
                 .toList()
@@ -159,22 +157,14 @@ class OrthogonalEdgeRouter {
             return points
         }
 
-        val result =
-            mutableListOf<Point>()
+        val result = mutableListOf<Point>()
 
         result += points.first()
 
         points
             .zipWithNext()
             .forEach { (start, end) ->
-
-                val replacement =
-                    routeSegmentAroundObstacles(
-                        start = start,
-                        end = end,
-                        obstacles = obstacles
-                    )
-
+                val replacement = routeSegmentAroundObstacles(start = start, end = end, obstacles = obstacles)
                 replacement
                     .drop(1)
                     .forEach { point ->
@@ -264,27 +254,13 @@ class OrthogonalEdgeRouter {
          * Choose the nearest side.
          */
         val corridorX =
-            if (
-                abs(start.x - leftCorridor) <
-                abs(start.x - rightCorridor)
-            ) {
+            if (abs(start.x - leftCorridor) < abs(start.x - rightCorridor)) {
                 leftCorridor
             } else {
                 rightCorridor
             }
 
-        return listOf(
-            start,
-            Point(
-                corridorX,
-                start.y
-            ),
-            Point(
-                corridorX,
-                end.y
-            ),
-            end
-        )
+        return listOf(start, Point(corridorX, start.y), Point(corridorX, end.y), end)
     }
 
     /**
@@ -337,18 +313,7 @@ class OrthogonalEdgeRouter {
                 bottomCorridor
             }
 
-        return listOf(
-            start,
-            Point(
-                start.x,
-                corridorY
-            ),
-            Point(
-                end.x,
-                corridorY
-            ),
-            end
-        )
+        return listOf(start, Point(start.x, corridorY), Point(end.x, corridorY), end)
     }
 
     /**
@@ -362,18 +327,14 @@ class OrthogonalEdgeRouter {
             return points
         }
 
-        val result =
-            mutableListOf<Point>()
+        val result = mutableListOf<Point>()
 
         points.forEach { point ->
 
             /*
              * Remove duplicate points.
              */
-            if (
-                result.isNotEmpty() &&
-                result.last() == point
-            ) {
+            if (result.isNotEmpty() && result.last() == point) {
                 return@forEach
             }
 
@@ -382,26 +343,13 @@ class OrthogonalEdgeRouter {
                 return@forEach
             }
 
-            val first =
-                result[result.size - 2]
+            val first = result[result.size - 2]
+            val second = result[result.size - 1]
+            val sameVerticalLine = first.x == second.x && second.x == point.x
+            val sameHorizontalLine = first.y == second.y && second.y == point.y
 
-            val second =
-                result[result.size - 1]
-
-            val sameVerticalLine =
-                first.x == second.x &&
-                        second.x == point.x
-
-            val sameHorizontalLine =
-                first.y == second.y &&
-                        second.y == point.y
-
-            if (
-                sameVerticalLine ||
-                sameHorizontalLine
-            ) {
-                result[result.lastIndex] =
-                    point
+            if (sameVerticalLine || sameHorizontalLine) {
+                result[result.lastIndex] = point
             } else {
                 result += point
             }
@@ -417,34 +365,12 @@ class OrthogonalEdgeRouter {
     /**
      * Рассчитывает смещение для параллельных переходов.
      */
-    private fun calculateParallelOffset(
-        index: Int,
-        count: Int
-    ): Int {
-
+    private fun calculateParallelOffset(index: Int, count: Int): Int {
         if (count <= 1) {
             return 0
         }
-
-        /*
-         * Two:
-         *
-         * -9
-         * +9
-         *
-         * Three:
-         *
-         * -18
-         *   0
-         * +18
-         */
-        val center =
-            (count - 1) / 2.0
-
-        return (
-                (index - center) *
-                        PARALLEL_EDGE_GAP
-                ).toInt()
+        val center = (count - 1) / 2.0
+        return ((index - center) * PARALLEL_EDGE_GAP).toInt()
     }
 
     // -------------------------------------------------------------------------
@@ -512,18 +438,8 @@ class OrthogonalEdgeRouter {
         target: NodeLayout,
         parallelOffset: Int
     ): EdgeLayout {
-
-        val start =
-            Point(
-                source.bottom.x + parallelOffset,
-                source.bottom.y
-            )
-
-        val end =
-            Point(
-                target.top.x + parallelOffset,
-                target.top.y
-            )
+        val start = Point(source.bottom.x + parallelOffset, source.bottom.y)
+        val end = Point(target.top.x + parallelOffset, target.top.y)
 
         /*
          * Source and target are directly
@@ -567,21 +483,9 @@ class OrthogonalEdgeRouter {
          *                       v
          *                     TARGET
          */
-        val middleY =
-            (start.y + end.y) / 2 +
-                    parallelOffset
-
-        val firstCorner =
-            Point(
-                start.x,
-                middleY
-            )
-
-        val secondCorner =
-            Point(
-                end.x,
-                middleY
-            )
+        val middleY = (start.y + end.y) / 2 + parallelOffset
+        val firstCorner = Point(start.x, middleY)
+        val secondCorner = Point(end.x, middleY)
 
         return EdgeLayout(
             points = listOf(
@@ -621,8 +525,7 @@ class OrthogonalEdgeRouter {
         parallelOffset: Int
     ): EdgeLayout {
 
-        val leftToRight =
-            target.x > source.x
+        val leftToRight = target.x > source.x
 
         val startBase =
             if (leftToRight) {
@@ -638,17 +541,8 @@ class OrthogonalEdgeRouter {
                 target.right
             }
 
-        val start =
-            Point(
-                startBase.x,
-                startBase.y + parallelOffset
-            )
-
-        val end =
-            Point(
-                endBase.x,
-                endBase.y + parallelOffset
-            )
+        val start = Point(startBase.x, startBase.y + parallelOffset)
+        val end = Point(endBase.x, endBase.y + parallelOffset)
 
         /*
          * For a horizontal transition keep the event
@@ -698,18 +592,8 @@ class OrthogonalEdgeRouter {
         target: NodeLayout,
         parallelOffset: Int
     ): EdgeLayout {
-
-        val start =
-            Point(
-                source.right.x,
-                source.right.y + parallelOffset
-            )
-
-        val end =
-            Point(
-                target.right.x,
-                target.right.y + parallelOffset
-            )
+        val start = Point(source.right.x, source.right.y + parallelOffset)
+        val end = Point(target.right.x, target.right.y + parallelOffset)
 
         /*
          * Back edge initially goes outside
@@ -718,25 +602,10 @@ class OrthogonalEdgeRouter {
          * Obstacle-aware routing may modify
          * these segments afterwards.
          */
-        val sideX =
-            maxOf(
-                source.right.x,
-                target.right.x
-            ) +
-                    BACK_EDGE_GAP +
-                    parallelOffset
+        val sideX = maxOf(source.right.x, target.right.x) + BACK_EDGE_GAP + parallelOffset
 
-        val firstCorner =
-            Point(
-                sideX,
-                start.y
-            )
-
-        val secondCorner =
-            Point(
-                sideX,
-                end.y
-            )
+        val firstCorner = Point(sideX, start.y)
+        val secondCorner = Point(sideX, end.y)
 
         val eventPosition =
             if (edge.event != null) {
@@ -788,8 +657,7 @@ class OrthogonalEdgeRouter {
             return emptyList()
         }
 
-        val actionsCount =
-            edge.actions.size
+        val actionsCount = edge.actions.size
 
         return edge.actions.mapIndexed { index, _ ->
 
@@ -824,17 +692,13 @@ class OrthogonalEdgeRouter {
          * CHOICE_BRANCH without guard:
          * renderer displays "otherwise".
          */
-        val hasGuard =
-            edge.guard != null ||
-                    edge.type == DiagramEdge.Type.CHOICE_BRANCH
+        val hasGuard = edge.guard != null || edge.type == DiagramEdge.Type.CHOICE_BRANCH
 
         if (!hasGuard) {
             return null
         }
 
-        val actionsHeight =
-            edge.actions.size *
-                    ACTION_LABEL_GAP
+        val actionsHeight = edge.actions.size * ACTION_LABEL_GAP
 
         return Point(
             target.center.x + parallelOffset,
@@ -858,9 +722,7 @@ class OrthogonalEdgeRouter {
             return null
         }
 
-        val actionsHeight =
-            edge.actions.size *
-                    ACTION_LABEL_GAP
+        val actionsHeight = edge.actions.size * ACTION_LABEL_GAP
 
         val guardHeight =
             if (

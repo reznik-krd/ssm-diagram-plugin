@@ -23,21 +23,12 @@ class ReadableGraphTransformer {
     /**
      * Преобразует канонический граф в граф, оптимизированный для чтения.
      */
-    fun transform(
-        graph: DiagramGraph
-    ): DiagramGraph {
-
-        val nodes =
-            graph.nodes.toMutableList()
-
-        val edges =
-            graph.edges.toMutableList()
-
-        val candidates =
-            findDuplicationCandidates(graph)
+    fun transform(graph: DiagramGraph): DiagramGraph {
+        val nodes = graph.nodes.toMutableList()
+        val edges = graph.edges.toMutableList()
+        val candidates = findDuplicationCandidates(graph)
 
         candidates.forEach { candidate ->
-
             duplicateIncomingEdges(
                 candidate,
                 nodes,
@@ -64,19 +55,16 @@ class ReadableGraphTransformer {
                 return@filter false
             }
 
-            val incoming =
-                graph.incoming(node.id)
+            val incoming = graph.incoming(node.id)
                     .filter {
                         it.type == DiagramEdge.Type.TRANSITION
                     }
 
-            val distinctSources =
-                incoming
+            val distinctSources = incoming
                     .map { it.source }
                     .distinct()
 
-            distinctSources.size >=
-                    MIN_DISTINCT_SOURCES_FOR_DUPLICATION
+            distinctSources.size >= MIN_DISTINCT_SOURCES_FOR_DUPLICATION
         }
     }
 
@@ -89,22 +77,15 @@ class ReadableGraphTransformer {
         edges: MutableList<DiagramEdge>
     ) {
 
-        val incoming =
-            edges
+        val incoming = edges
                 .filter {
-                    it.target == node.id &&
-                            it.type == DiagramEdge.Type.TRANSITION
+                    it.target == node.id && it.type == DiagramEdge.Type.TRANSITION
                 }
 
-        val outgoing =
-            edges.filter {
-                it.source == node.id &&
-                        (
-                                it.type ==
-                                        DiagramEdge.Type.TRANSITION ||
-                                        it.type ==
-                                        DiagramEdge.Type.CHOICE_BRANCH
-                                )
+        val outgoing = edges
+            .filter {
+                it.source == node.id
+                        && (it.type == DiagramEdge.Type.TRANSITION || it.type == DiagramEdge.Type.CHOICE_BRANCH)
             }
 
         if (incoming.isEmpty()) {
@@ -153,23 +134,9 @@ class ReadableGraphTransformer {
         }
 
         edgesToDuplicate.forEachIndexed { index, edge ->
-
-            val copyId =
-                createCopyId(
-                    node,
-                    edge,
-                    index
-                )
-
-            nodes += node.copy(
-                id = copyId,
-                visualCopy = true
-            )
-
-            edges += edge.copy(
-                id = "${edge.id}__copy__$index",
-                target = copyId
-            )
+            val copyId = createCopyId(node, edge, index)
+            nodes += node.copy(id = copyId, visualCopy = true)
+            edges += edge.copy(id = "${edge.id}__copy__$index", target = copyId)
         }
     }
 
@@ -181,21 +148,13 @@ class ReadableGraphTransformer {
         edge: DiagramEdge,
         index: Int
     ): String {
-
         return buildString {
-
             append(node.logicalId)
-
             append("__copy__")
-
             append(edge.source)
-
             append("__")
-
             append(edge.id)
-
             append("__")
-
             append(index)
         }
     }

@@ -30,13 +30,9 @@ internal class NodeRenderer(
         /*
          * Concrete edge selected by clicking a transition.
          */
-        val selectedEdge =
-            interaction.selectedEdgeId
-                ?.let { selectedEdgeId ->
-                    graph.edges
-                        .firstOrNull {
-                            it.id == selectedEdgeId
-                        }
+        val selectedEdge = interaction.selectedEdgeId
+                ?.let { selectedEdgeId -> graph.edges
+                        .firstOrNull { it.id == selectedEdgeId }
                 }
 
         /*
@@ -45,44 +41,29 @@ internal class NodeRenderer(
          * logicalId is used because ReadableGraphTransformer
          * may create several visual copies of one logical state.
          */
-        val selectedNodeLogicalId =
-            interaction.selectedNodeLogicalId
+        val selectedNodeLogicalId = interaction.selectedNodeLogicalId
 
         graph.nodes.forEach { node ->
 
-            val nodeLayout =
-                layout.nodes[node.id]
-                    ?: return@forEach
+            val nodeLayout = layout.nodes[node.id] ?: return@forEach
 
-            val position =
-                Point(
-                    nodeLayout.x,
-                    nodeLayout.y
-                )
+            val position = Point(nodeLayout.x, nodeLayout.y)
 
             /*
              * State was explicitly selected.
              */
-            val selectedByNode =
-                selectedNodeLogicalId != null &&
+            val selectedByNode = selectedNodeLogicalId != null &&
                         node.logicalId == selectedNodeLogicalId
 
             /*
              * Node is source/target of explicitly selected edge.
              */
-            val selectedByEdge =
-                selectedEdge != null &&
-                        (
-                                node.id == selectedEdge.source ||
-                                        node.id == selectedEdge.target
-                                )
+            val selectedByEdge = selectedEdge != null
+                    && (node.id == selectedEdge.source || node.id == selectedEdge.target)
 
-            val selected =
-                selectedByNode ||
-                        selectedByEdge
+            val selected = selectedByNode || selectedByEdge
 
             when (node.type) {
-
                 DiagramNode.Type.INITIAL_MARKER ->
                     drawInitialMarker(
                         g2 = g2,
@@ -139,20 +120,10 @@ internal class NodeRenderer(
         height: Int,
         selected: Boolean
     ) {
-
-        val hovered =
-            node.id == interaction.hoveredNodeId
-
+        val hovered = node.id == interaction.hoveredNodeId
         g2.color = DiagramColors.STATE_BACKGROUND
 
-        g2.fillRoundRect(
-            position.x,
-            position.y,
-            width,
-            height,
-            14,
-            14
-        )
+        g2.fillRoundRect(position.x, position.y, width, height, 14, 14)
 
         g2.color = when {
             selected -> DiagramColors.SELECTED_BORDER
@@ -163,64 +134,21 @@ internal class NodeRenderer(
         g2.stroke =
             BasicStroke(
                 when {
-
-                    selected ->
-                        SELECTED_NODE_WIDTH
-
-                    hovered ->
-                        HOVER_NODE_WIDTH
-
-                    else ->
-                        NORMAL_NODE_WIDTH
+                    selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
+                    hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
+                    else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
                 }
             )
 
-        g2.drawRoundRect(
-            position.x,
-            position.y,
-            width,
-            height,
-            14,
-            14
-        )
-
-        val oldFont =
-            g2.font
-
-        g2.font =
-            oldFont.deriveFont(
-                Font.PLAIN,
-                13f
-            )
-
-        val metrics =
-            g2.fontMetrics
-
-        val textX =
-            position.x +
-                    (
-                            width -
-                                    metrics.stringWidth(node.label)
-                            ) / 2
-
-        val textY =
-            position.y +
-                    (
-                            height -
-                                    metrics.height
-                            ) / 2 +
-                    metrics.ascent
-
+        g2.drawRoundRect(position.x, position.y, width, height, 14, 14)
+        val oldFont = g2.font
+        g2.font = oldFont.deriveFont(Font.PLAIN, 13f)
+        val metrics = g2.fontMetrics
+        val textX = position.x + (width - metrics.stringWidth(node.label)) / 2
+        val textY = position.y + (height - metrics.height) / 2 + metrics.ascent
         g2.color = DiagramColors.STATE_TEXT
-
-        g2.drawString(
-            node.label,
-            textX,
-            textY
-        )
-
-        g2.font =
-            oldFont
+        g2.drawString(node.label, textX, textY)
+        g2.font = oldFont
     }
 
     // -------------------------------------------------------------------------
@@ -238,17 +166,9 @@ internal class NodeRenderer(
         height: Int,
         selected: Boolean
     ) {
-
-        val centerX =
-            position.x +
-                    width / 2
-
-        val centerY =
-            position.y +
-                    height / 2
-
-        val halfSize =
-            26
+        val centerX = position.x + width / 2
+        val centerY = position.y + height / 2
+        val halfSize = 26
 
         val xPoints =
             intArrayOf(
@@ -266,52 +186,27 @@ internal class NodeRenderer(
                 centerY
             )
 
-        val hovered =
-            node.id == interaction.hoveredNodeId
-
+        val hovered = node.id == interaction.hoveredNodeId
         g2.color = DiagramColors.CHOICE_BACKGROUND
 
-        g2.fillPolygon(
-            xPoints,
-            yPoints,
-            4
-        )
-
+        g2.fillPolygon(xPoints, yPoints, 4)
         g2.color = when {
             selected -> DiagramColors.SELECTED_BORDER
             hovered -> DiagramColors.CHOICE_HOVER_BORDER
             else -> DiagramColors.CHOICE_BORDER
         }
 
-        g2.stroke =
-            BasicStroke(
+        g2.stroke = BasicStroke(
                 when {
-
-                    selected ->
-                        SELECTED_NODE_WIDTH
-
-                    hovered ->
-                        HOVER_NODE_WIDTH
-
-                    else ->
-                        NORMAL_NODE_WIDTH
+                    selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
+                    hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
+                    else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
                 }
             )
 
-        g2.drawPolygon(
-            xPoints,
-            yPoints,
-            4
-        )
-
+        g2.drawPolygon(xPoints, yPoints, 4)
         g2.color = DiagramColors.CHOICE_TEXT
-
-        g2.drawString(
-            node.label,
-            centerX +
-                    halfSize +
-                    12,
-            centerY + 5
+        g2.drawString(node.label, centerX + halfSize + 12, centerY + 5
         )
     }
 
@@ -329,14 +224,8 @@ internal class NodeRenderer(
         height: Int,
         selected: Boolean
     ) {
-
-        val centerX =
-            position.x +
-                    width / 2
-
-        val centerY =
-            position.y +
-                    height / 2
+        val centerX = position.x + width / 2
+        val centerY = position.y + height / 2
 
         val radius =
             if (selected) {
@@ -374,14 +263,8 @@ internal class NodeRenderer(
         height: Int,
         selected: Boolean
     ) {
-
-        val centerX =
-            position.x +
-                    width / 2
-
-        val centerY =
-            position.y +
-                    height / 2
+        val centerX = position.x + width / 2
+        val centerY = position.y + height / 2
 
         val outerRadius =
             if (selected) {
@@ -407,9 +290,9 @@ internal class NodeRenderer(
         g2.stroke =
             BasicStroke(
                 if (selected) {
-                    SELECTED_NODE_WIDTH
+                    NodeRenderDimensions.SELECTED_NODE_WIDTH
                 } else {
-                    NORMAL_NODE_WIDTH
+                    NodeRenderDimensions.NORMAL_NODE_WIDTH
                 }
             )
 
@@ -428,19 +311,4 @@ internal class NodeRenderer(
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Style
-    // -------------------------------------------------------------------------
-
-    private companion object {
-
-        const val NORMAL_NODE_WIDTH =
-            1.4f
-
-        const val HOVER_NODE_WIDTH =
-            2.2f
-
-        const val SELECTED_NODE_WIDTH =
-            3.0f
-    }
 }

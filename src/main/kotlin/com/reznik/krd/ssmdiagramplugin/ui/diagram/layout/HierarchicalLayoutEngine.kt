@@ -11,30 +11,7 @@ import java.util.ArrayDeque
 class HierarchicalLayoutEngine {
 
     private val edgeRouter = OrthogonalEdgeRouter()
-    private val nodeWidth = 180
-    private val nodeHeight = 60
 
-    /*
-     * Нам теперь важнее читаемость, чем компактность.
-     *
-     * Большой horizontalGap даёт место:
-     * - для labels;
-     * - для параллельных edges;
-     * - для guards.
-     */
-    private val horizontalGap = 140
-
-    /*
-     * Между уровнями оставляем место для:
-     *
-     * - actions предыдущего transition;
-     * - event;
-     * - guard;
-     * - routing.
-     */
-    private val verticalGap = 180
-
-    private val margin = 100
 
     /**
      * Рассчитывает положение узлов, маршруты рёбер и размер диаграммы.
@@ -218,12 +195,12 @@ class HierarchicalLayoutEngine {
              * Каждый ряд центрируем относительно
              * самого широкого ряда.
              */
-            var x = margin + (maxLayerWidth - layerWidth) / 2
-            val y = margin + level * (nodeHeight + verticalGap)
+            var x = LayoutDimensions.CANVAS_MARGIN + (maxLayerWidth - layerWidth) / 2
+            val y = LayoutDimensions.CANVAS_MARGIN + level * (LayoutDimensions.NODE_HEIGHT + LayoutDimensions.VERTICAL_GAP)
 
             layerNodes.forEach { node ->
-                result[node.id] = NodeLayout(x = x, y = y, width = nodeWidth, height = nodeHeight)
-                x += nodeWidth + horizontalGap
+                result[node.id] = NodeLayout(x = x, y = y, width = LayoutDimensions.NODE_WIDTH, height = LayoutDimensions.NODE_HEIGHT)
+                x += LayoutDimensions.NODE_WIDTH + LayoutDimensions.HORIZONTAL_GAP
             }
         }
 
@@ -237,7 +214,7 @@ class HierarchicalLayoutEngine {
         if (nodeCount <= 0) {
             return 0
         }
-        return nodeCount * nodeWidth + (nodeCount - 1) * horizontalGap
+        return nodeCount * LayoutDimensions.NODE_WIDTH + (nodeCount - 1) * LayoutDimensions.HORIZONTAL_GAP
     }
 
     /**
@@ -252,8 +229,8 @@ class HierarchicalLayoutEngine {
         val maxY = nodes.values.maxOf { it.y + it.height }
 
         return Dimension(
-            maxOf(maxX + margin, 600),
-            maxOf(maxY + margin, 500)
+            maxOf(maxX + LayoutDimensions.CANVAS_MARGIN, 600),
+            maxOf(maxY + LayoutDimensions.CANVAS_MARGIN, 500)
         )
     }
 

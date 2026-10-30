@@ -31,16 +31,8 @@ internal class EdgeRenderer(
     /**
      * Отрисовывает соответствующую часть диаграммы.
      */
-    fun render(
-        g2: Graphics2D,
-        graph: DiagramGraph,
-        layout: DiagramLayout
-    ) {
-        drawEdges(
-            g2,
-            graph,
-            layout
-        )
+    fun render(g2: Graphics2D, graph: DiagramGraph, layout: DiagramLayout) {
+        drawEdges(g2, graph, layout)
     }
 
     // -------------------------------------------------------------------------
@@ -114,20 +106,12 @@ internal class EdgeRenderer(
         layout: DiagramLayout,
         selected: Boolean
     ) {
-
-        val edgeLayout =
-            layout.edges[edge.id]
-                ?: return
-
+        val edgeLayout = layout.edges[edge.id] ?: return
         if (edgeLayout.points.size < 2) {
             return
         }
-
-        val oldStroke =
-            g2.stroke
-
-        val oldColor =
-            g2.color
+        val oldStroke = g2.stroke
+        val oldColor = g2.color
 
         /*
          * Selected edge:
@@ -135,12 +119,11 @@ internal class EdgeRenderer(
          * - thicker
          * - accent color
          */
-        g2.stroke =
-            BasicStroke(
+        g2.stroke = BasicStroke(
                 if (selected) {
-                    SELECTED_EDGE_WIDTH
+                    EdgeRenderDimensions.SELECTED_EDGE_WIDTH
                 } else {
-                    NORMAL_EDGE_WIDTH
+                    EdgeRenderDimensions.NORMAL_EDGE_WIDTH
                 },
                 BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND
@@ -172,36 +155,18 @@ internal class EdgeRenderer(
          * Arrowhead uses the same stroke/color,
          * therefore selected arrow is highlighted too.
          */
-        val beforeEnd =
-            edgeLayout.points[
-                edgeLayout.points.size - 2
-            ]
+        val beforeEnd = edgeLayout.points[edgeLayout.points.size - 2]
+        val end = edgeLayout.points.last()
 
-        val end =
-            edgeLayout.points.last()
-
-        drawArrowHead(
-            g2 = g2,
-            from = beforeEnd,
-            to = end
-        )
+        drawArrowHead(g2 = g2, from = beforeEnd, to = end)
 
         /*
          * Labels belonging to selected edge
          * are highlighted as well.
          */
-        drawEdgeLabels(
-            g2 = g2,
-            edge = edge,
-            edgeLayout = edgeLayout,
-            selected = selected
-        )
-
-        g2.stroke =
-            oldStroke
-
-        g2.color =
-            oldColor
+        drawEdgeLabels(g2 = g2, edge = edge, edgeLayout = edgeLayout, selected = selected)
+        g2.stroke = oldStroke
+        g2.color = oldColor
     }
 
     // -------------------------------------------------------------------------
@@ -222,22 +187,16 @@ internal class EdgeRenderer(
          * Technical INITIAL / END edges
          * do not have labels.
          */
-        if (
-            edge.type == DiagramEdge.Type.INITIAL ||
-            edge.type == DiagramEdge.Type.END
-        ) {
+        if (edge.type == DiagramEdge.Type.INITIAL || edge.type == DiagramEdge.Type.END) {
             return
         }
 
         /*
          * Event.
          */
-        edge.event
-            ?.let { event ->
-
+        edge.event?.let { event ->
                 edgeLayout.eventLabelPosition
                     ?.let { position ->
-
                         drawLabelChip(
                             g2 = g2,
                             text = event,
@@ -254,35 +213,21 @@ internal class EdgeRenderer(
          */
         val guardText =
             when {
-
-                edge.guard != null &&
-                        edge.type ==
-                        DiagramEdge.Type.CHOICE_BRANCH -> {
-
+                edge.guard != null && edge.type == DiagramEdge.Type.CHOICE_BRANCH -> {
                     edge.guard.name
                 }
-
                 edge.guard != null -> {
-
                     "[${edge.guard.name}]"
                 }
-
-                edge.type ==
-                        DiagramEdge.Type.CHOICE_BRANCH -> {
-
+                edge.type == DiagramEdge.Type.CHOICE_BRANCH -> {
                     "otherwise"
                 }
-
-                else ->
-                    null
+                else -> null
             }
 
-        guardText
-            ?.let { text ->
-
+        guardText?.let { text ->
                 edgeLayout.guardLabelPosition
                     ?.let { position ->
-
                         drawLabelChip(
                             g2 = g2,
                             text = text,
@@ -298,13 +243,8 @@ internal class EdgeRenderer(
          * Actions.
          */
         edge.actions
-            .zip(
-                edgeLayout.actionLabelPositions
-            )
-            .forEachIndexed {
-                    index,
-                    (ssmAction, position) ->
-
+            .zip(edgeLayout.actionLabelPositions)
+            .forEachIndexed { index, (ssmAction, position) ->
                 drawActionLabel(
                     g2 = g2,
                     edge = edge,
@@ -331,55 +271,24 @@ internal class EdgeRenderer(
         position: Point,
         selected: Boolean
     ) {
+        val oldFont = g2.font
+        val oldColor = g2.color
+        val oldStroke = g2.stroke
 
-        val oldFont =
-            g2.font
-
-        val oldColor =
-            g2.color
-
-        val oldStroke =
-            g2.stroke
-
-        g2.font =
-            oldFont.deriveFont(
-                Font.PLAIN,
-                11f
-            )
-
-        val text =
-            "⚡ ${action.action.name}"
-
-        val metrics =
-            g2.fontMetrics
-
-        val textWidth =
-            metrics.stringWidth(text)
-
-        val textHeight =
-            metrics.height
-
-        val horizontalPadding =
-            7
-
-        val verticalPadding =
-            3
+        g2.font = oldFont.deriveFont(Font.PLAIN, 11f)
+        val text = "⚡ ${action.action.name}"
+        val metrics = g2.fontMetrics
+        val textWidth = metrics.stringWidth(text)
+        val textHeight = metrics.height
+        val horizontalPadding = 7
+        val verticalPadding = 3
 
         val bounds =
             Rectangle(
-                position.x -
-                        textWidth / 2 -
-                        horizontalPadding,
-
-                position.y -
-                        metrics.ascent -
-                        verticalPadding,
-
-                textWidth +
-                        horizontalPadding * 2,
-
-                textHeight +
-                        verticalPadding * 2
+                position.x - textWidth / 2 - horizontalPadding,
+                position.y - metrics.ascent - verticalPadding,
+                textWidth + horizontalPadding * 2,
+                textHeight + verticalPadding * 2
             )
 
         /*
@@ -392,46 +301,24 @@ internal class EdgeRenderer(
                 bounds = bounds
             )
 
-        val hovered =
-            interaction.hoveredAction ==
-                    ActionKey(
-                        edge.id,
-                        actionIndex
-                    )
+        val hovered = interaction.hoveredAction == ActionKey(edge.id, actionIndex)
 
         /*
          * Background.
          */
         g2.color =
             when {
-
-                selected ->
-                    DiagramColors.SELECTED_LABEL_BACKGROUND
-
-                hovered ->
-                    HOVER_BACKGROUND
-
-                else ->
-                    JBColor.PanelBackground
+                selected -> DiagramColors.SELECTED_LABEL_BACKGROUND
+                hovered -> HOVER_BACKGROUND
+                else -> JBColor.PanelBackground
             }
 
-        g2.fillRoundRect(
-            bounds.x,
-            bounds.y,
-            bounds.width,
-            bounds.height,
-            8,
-            8
-        )
+        g2.fillRoundRect(bounds.x, bounds.y, bounds.width, bounds.height, 8, 8)
 
         /*
          * Border.
          */
-        if (
-            selected ||
-            hovered
-        ) {
-
+        if (selected || hovered) {
             g2.color =
                 if (selected) {
                     DiagramColors.SELECTED_BORDER
@@ -463,32 +350,19 @@ internal class EdgeRenderer(
          */
         g2.color =
             when {
-
-                selected ->
-                    DiagramColors.SELECTED_TEXT
-
-                hovered ->
-                    JBColor.foreground()
-
-                else ->
-                    JBColor.GRAY
+                selected -> DiagramColors.SELECTED_TEXT
+                hovered -> JBColor.foreground()
+                else -> JBColor.GRAY
             }
 
         g2.drawString(
             text,
-            position.x -
-                    textWidth / 2,
-            position.y
-        )
+            position.x - textWidth / 2,
+            position.y)
 
-        g2.font =
-            oldFont
-
-        g2.color =
-            oldColor
-
-        g2.stroke =
-            oldStroke
+        g2.font = oldFont
+        g2.color = oldColor
+        g2.stroke = oldStroke
     }
 
     // -------------------------------------------------------------------------
@@ -507,117 +381,50 @@ internal class EdgeRenderer(
         selected: Boolean = false
     ) {
 
-        val oldFont =
-            g2.font
+        val oldFont = g2.font
+        val oldStroke = g2.stroke
+        val oldColor = g2.color
 
-        val oldStroke =
-            g2.stroke
-
-        val oldColor =
-            g2.color
-
-        g2.font =
-            when (kind) {
-
-                LabelKind.EVENT ->
-                    oldFont.deriveFont(
-                        Font.PLAIN,
-                        12f
-                    )
-
-                LabelKind.GUARD ->
-                    oldFont.deriveFont(
-                        Font.PLAIN,
-                        11f
-                    )
-
-                LabelKind.ACTION ->
-                    oldFont.deriveFont(
-                        Font.PLAIN,
-                        11f
-                    )
+        g2.font = when (kind) {
+                LabelKind.EVENT -> oldFont.deriveFont(Font.PLAIN, 12f)
+                LabelKind.GUARD -> oldFont.deriveFont(Font.PLAIN, 11f)
+                LabelKind.ACTION -> oldFont.deriveFont(Font.PLAIN, 11f)
             }
 
-        val metrics =
-            g2.fontMetrics
-
-        val paddingX =
-            6
-
-        val paddingY =
-            3
-
-        val textWidth =
-            metrics.stringWidth(text)
-
-        val chipWidth =
-            textWidth +
-                    paddingX * 2
-
-        val chipHeight =
-            metrics.height +
-                    paddingY * 2
+        val metrics = g2.fontMetrics
+        val paddingX = 6
+        val paddingY = 3
+        val textWidth = metrics.stringWidth(text)
+        val chipWidth = textWidth + paddingX * 2
+        val chipHeight = metrics.height + paddingY * 2
 
         /*
          * position.x = center of label.
          */
-        val chipX =
-            position.x -
-                    chipWidth / 2
+        val chipX = position.x - chipWidth / 2
 
         /*
          * position.y = text baseline.
          */
-        val chipY =
-            position.y -
-                    metrics.ascent -
-                    paddingY
-
-        val bounds =
-            Rectangle(
-                chipX,
-                chipY,
-                chipWidth,
-                chipHeight
-            )
+        val chipY = position.y - metrics.ascent - paddingY
+        val bounds = Rectangle(chipX, chipY, chipWidth, chipHeight)
 
         /*
          * Hit areas.
          */
         if (edgeId != null) {
-
             when (kind) {
-
-                LabelKind.EVENT ->
-                    hitRegistry.eventAreas[
-                        edgeId
-                    ] = bounds
-
-                LabelKind.GUARD ->
-                    hitRegistry.guardAreas[
-                        edgeId
-                    ] = bounds
-
-                LabelKind.ACTION ->
-                    Unit
+                LabelKind.EVENT -> hitRegistry.eventAreas[edgeId] = bounds
+                LabelKind.GUARD -> hitRegistry.guardAreas[edgeId] = bounds
+                LabelKind.ACTION -> Unit
             }
         }
 
         val hovered =
             when (kind) {
-
-                LabelKind.EVENT ->
-                    edgeId != null &&
-                            edgeId ==
-                            interaction.hoveredEventEdgeId
-
-                LabelKind.GUARD ->
-                    edgeId != null &&
-                            edgeId ==
-                            interaction.hoveredGuardEdgeId
-
-                LabelKind.ACTION ->
-                    false
+                LabelKind.EVENT -> edgeId != null && edgeId == interaction.hoveredEventEdgeId
+                LabelKind.GUARD -> edgeId != null && edgeId == interaction.hoveredGuardEdgeId
+                LabelKind.ACTION -> false
             }
 
         /*
@@ -625,15 +432,9 @@ internal class EdgeRenderer(
          */
         g2.color =
             when {
-
-                selected ->
-                    DiagramColors.SELECTED_LABEL_BACKGROUND
-
-                hovered ->
-                    HOVER_BACKGROUND
-
-                else ->
-                    JBColor.PanelBackground
+                selected -> DiagramColors.SELECTED_LABEL_BACKGROUND
+                hovered -> HOVER_BACKGROUND
+                else -> JBColor.PanelBackground
             }
 
         g2.fillRoundRect(
@@ -648,11 +449,7 @@ internal class EdgeRenderer(
         /*
          * Border.
          */
-        if (
-            selected ||
-            hovered
-        ) {
-
+        if (selected || hovered) {
             g2.color =
                 if (selected) {
                     DiagramColors.SELECTED_BORDER
@@ -684,38 +481,17 @@ internal class EdgeRenderer(
          */
         g2.color =
             when {
-
-                selected ->
-                    DiagramColors.SELECTED_TEXT
-
-                kind == LabelKind.EVENT ->
-                    JBColor.foreground()
-
-                kind == LabelKind.GUARD &&
-                        hovered ->
-                    JBColor.foreground()
-
-                kind == LabelKind.GUARD ->
-                    JBColor.GRAY
-
-                else ->
-                    JBColor.foreground()
+                selected -> DiagramColors.SELECTED_TEXT
+                kind == LabelKind.EVENT -> JBColor.foreground()
+                kind == LabelKind.GUARD && hovered -> JBColor.foreground()
+                kind == LabelKind.GUARD -> JBColor.GRAY
+                else -> JBColor.foreground()
             }
 
-        g2.drawString(
-            text,
-            chipX + paddingX,
-            position.y
-        )
-
-        g2.font =
-            oldFont
-
-        g2.stroke =
-            oldStroke
-
-        g2.color =
-            oldColor
+        g2.drawString(text, chipX + paddingX, position.y)
+        g2.font = oldFont
+        g2.stroke = oldStroke
+        g2.color = oldColor
     }
 
     // -------------------------------------------------------------------------
@@ -730,96 +506,23 @@ internal class EdgeRenderer(
         from: Point,
         to: Point
     ) {
+        val angle = atan2((to.y - from.y).toDouble(), (to.x - from.x).toDouble())
+        val arrowLength = 10.0
+        val angleOffset = Math.toRadians(28.0)
+        val firstX = (to.x - arrowLength * cos(angle - angleOffset)).toInt()
+        val firstY = (to.y - arrowLength * sin(angle - angleOffset)).toInt()
+        val secondX = (to.x - arrowLength * cos(angle + angleOffset)).toInt()
+        val secondY = (to.y - arrowLength * sin(angle + angleOffset)).toInt()
 
-        val angle =
-            atan2(
-                (to.y - from.y)
-                    .toDouble(),
-                (to.x - from.x)
-                    .toDouble()
-            )
-
-        val arrowLength =
-            10.0
-
-        val angleOffset =
-            Math.toRadians(
-                28.0
-            )
-
-        val firstX =
-            (
-                    to.x -
-                            arrowLength *
-                            cos(
-                                angle -
-                                        angleOffset
-                            )
-                    ).toInt()
-
-        val firstY =
-            (
-                    to.y -
-                            arrowLength *
-                            sin(
-                                angle -
-                                        angleOffset
-                            )
-                    ).toInt()
-
-        val secondX =
-            (
-                    to.x -
-                            arrowLength *
-                            cos(
-                                angle +
-                                        angleOffset
-                            )
-                    ).toInt()
-
-        val secondY =
-            (
-                    to.y -
-                            arrowLength *
-                            sin(
-                                angle +
-                                        angleOffset
-                            )
-                    ).toInt()
-
-        g2.drawLine(
-            to.x,
-            to.y,
-            firstX,
-            firstY
-        )
-
-        g2.drawLine(
-            to.x,
-            to.y,
-            secondX,
-            secondY
-        )
+        g2.drawLine(to.x, to.y, firstX, firstY)
+        g2.drawLine(to.x, to.y, secondX, secondY)
     }
 
     // -------------------------------------------------------------------------
     // Types / constants
     // -------------------------------------------------------------------------
 
-    private enum class LabelKind {
-        EVENT,
-        GUARD,
-        ACTION
-    }
-
     private companion object {
-
-        const val NORMAL_EDGE_WIDTH =
-            1.4f
-
-        const val SELECTED_EDGE_WIDTH =
-            3.2f
-
         val HOVER_BACKGROUND =
             JBColor(
                 Color(225, 235, 250),
@@ -838,10 +541,7 @@ internal class EdgeRenderer(
         /*
          * Explicit transition selection.
          */
-        if (
-            edge.id ==
-            interaction.selectedEdgeId
-        ) {
+        if (edge.id == interaction.selectedEdgeId) {
             return true
         }
 
@@ -851,15 +551,10 @@ internal class EdgeRenderer(
          * highlight every transition whose target
          * belongs to the selected logical state.
          */
-        val selectedLogicalId =
-            interaction.selectedNodeLogicalId
-                ?: return false
+        val selectedLogicalId = interaction.selectedNodeLogicalId ?: return false
 
-        val targetNode =
-            graph.node(edge.target)
-                ?: return false
+        val targetNode = graph.node(edge.target) ?: return false
 
-        return targetNode.logicalId ==
-                selectedLogicalId
+        return targetNode.logicalId == selectedLogicalId
     }
 }

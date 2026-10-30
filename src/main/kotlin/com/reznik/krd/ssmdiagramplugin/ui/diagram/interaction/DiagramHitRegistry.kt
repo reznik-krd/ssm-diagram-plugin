@@ -19,12 +19,3 @@ class DiagramHitRegistry {
         actionAreas.clear()
     }
 }
-
-/**
- * Описывает кликабельную область action на конкретном переходе.
- */
-data class ActionHitArea(
-    val edgeId: String,
-    val actionIndex: Int,
-    val bounds: Rectangle
-)
