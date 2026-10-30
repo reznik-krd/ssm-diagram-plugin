@@ -9,6 +9,9 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.ActionKey
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramHitRegistry
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramInteractionConstants
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramInteractionState
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramZoomController
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramPanController
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramKeyboardHandler
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.layout.DiagramLayout
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.layout.HierarchicalLayoutEngine
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramEdge
@@ -29,13 +32,6 @@ import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.JPanel
 import kotlin.math.sqrt
-import javax.swing.JViewport
-import javax.swing.SwingUtilities
-import kotlin.math.pow
-import java.awt.KeyboardFocusManager
-import java.awt.KeyEventDispatcher
-import java.awt.event.KeyEvent
-import java.awt.event.InputEvent
 
 /**
  * Swing-панель интерактивной диаграммы: отображение, zoom, hit testing, выбор и навигация.
@@ -52,74 +48,16 @@ class SsmDiagramPanel(project: Project) : JPanel() {
 
     private var graph: DiagramGraph? = null
     private var layout: DiagramLayout? = null
-    private var zoom = DiagramInteractionConstants.DEFAULT_ZOOM
-    private var zoomChangedListener: ((Double) -> Unit)? = null
+    private val zoomController = DiagramZoomController(this) { layout }
+    private val zoom: Double get() = zoomController.zoom
 
-    private var spacePressed = false
-    private var panning = false
-
-    private var lastDragScreenPoint: Point? = null
-    private var dragDistance = 0
-
-    private val panCursor = Cursor.getPredefinedCursor(Cursor.MOVE_CURSOR)
-
-    private val spaceKeyDispatcher = KeyEventDispatcher { event ->
-        val isSpaceEvent = when (event.id) {
-            KeyEvent.KEY_TYPED -> event.keyChar == ' '
-            else -> event.keyCode == KeyEvent.VK_SPACE
-        }
-
-        if (!isSpaceEvent) {
-            return@KeyEventDispatcher false
-        }
-
-        val diagramWindow = SwingUtilities.getWindowAncestor(this)
-        val activeWindow = KeyboardFocusManager
-            .getCurrentKeyboardFocusManager()
-            .activeWindow
-
-        if (diagramWindow == null || diagramWindow != activeWindow) {
-            return@KeyEventDispatcher false
-        }
-
-        when (event.id) {
-            KeyEvent.KEY_PRESSED -> {
-                if (spacePressed) {
-                    return@KeyEventDispatcher true
-                }
-
-                // Перехватываем Space только когда курсор над диаграммой.
-                if (mousePosition == null || layout == null) {
-                    return@KeyEventDispatcher false
-                }
-
-// Забираем фокус у редактора кода.
-                requestFocusInWindow()
-
-                spacePressed = true
-                cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-
-// Не пропускаем событие дальше в IntelliJ Editor.
-                true
-            }
-            KeyEvent.KEY_TYPED -> {
-                spacePressed && event.keyChar == ' '
-            }
-
-            KeyEvent.KEY_RELEASED -> {
-                if (!spacePressed) {
-                    return@KeyEventDispatcher false
-                }
-
-                spacePressed = false
-                stopPanning()
-                cursor = Cursor.getDefaultCursor()
-                true
-            }
-
-            else -> false
-        }
-    }
+    private val panController = DiagramPanController(this) { layout != null }
+    private val keyboardHandler = DiagramKeyboardHandler(this, panController) { layout != null }
+    private val spacePressed: Boolean get() = panController.spacePressed
+    private val panning: Boolean get() = panController.panning
+    private var dragDistance: Int
+        get() = panController.dragDistance
+        set(value) { panController.dragDistance = value }
 
     init {
         background = JBColor.PanelBackground
@@ -131,68 +69,20 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     // Zoom API
     // -------------------------------------------------------------------------
 
-    /**
-     * Регистрирует обработчик изменения масштаба.
-     */
-    fun setZoomChangedListener(listener: (Double) -> Unit) {
-        zoomChangedListener = listener
-        listener(zoom)
-    }
+    /** Регистрирует слушателя изменения масштаба. */
+    fun setZoomChangedListener(listener: (Double) -> Unit) = zoomController.setZoomChangedListener(listener)
 
-    /**
-     * Увеличивает масштаб диаграммы.
-     */
-    fun zoomIn() = setZoom(zoom + DiagramInteractionConstants.ZOOM_STEP)
+    /** Увеличивает масштаб. */
+    fun zoomIn() = zoomController.zoomIn()
 
-    /**
-     * Уменьшает масштаб диаграммы.
-     */
-    fun zoomOut() = setZoom(zoom - DiagramInteractionConstants.ZOOM_STEP)
+    /** Уменьшает масштаб. */
+    fun zoomOut() = zoomController.zoomOut()
 
-    /**
-     * Возвращает масштаб диаграммы к 100%.
-     */
-    fun resetZoom() = setZoom(DiagramInteractionConstants.DEFAULT_ZOOM)
+    /** Возвращает масштаб 100%. */
+    fun resetZoom() = zoomController.resetZoom()
 
-    /**
-     * Подбирает масштаб диаграммы под размер viewport.
-     */
-    fun fitToViewport(viewportSize: Dimension) {
-        val currentLayout = layout ?: return
-
-        if (
-            currentLayout.size.width <= 0 ||
-            currentLayout.size.height <= 0 ||
-            viewportSize.width <= 0 ||
-            viewportSize.height <= 0
-        ) {
-            return
-        }
-
-        val availableWidth = (viewportSize.width - DiagramInteractionConstants.FIT_PADDING).coerceAtLeast(1)
-
-        val availableHeight =
-            (
-                    viewportSize.height -
-                            DiagramInteractionConstants.FIT_PADDING
-                    )
-                .coerceAtLeast(1)
-
-        val widthZoom =
-            availableWidth.toDouble() /
-                    currentLayout.size.width
-
-        val heightZoom =
-            availableHeight.toDouble() /
-                    currentLayout.size.height
-
-        setZoom(
-            minOf(
-                widthZoom,
-                heightZoom
-            )
-        )
-    }
+    /** Вписывает диаграмму в заданный размер окна. */
+    fun fitToViewport(viewportSize: Dimension) = zoomController.fitToViewport(viewportSize)
 
     // -------------------------------------------------------------------------
     // Model
@@ -224,7 +114,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         interaction.clear()
         hitRegistry.clear()
 
-        updatePreferredSize()
+        zoomController.updatePreferredSize()
 
         revalidate()
         repaint()
@@ -235,9 +125,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
      */
     fun clear() {
 
-        spacePressed = false
-        stopPanning()
-        dragDistance = 0
+        panController.reset()
 
         graph =
             null
@@ -248,11 +136,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         interaction.clear()
         hitRegistry.clear()
 
-        zoom =
-            DiagramInteractionConstants.DEFAULT_ZOOM
-
-        zoomChangedListener
-            ?.invoke(zoom)
+        zoomController.resetState()
 
         preferredSize =
             Dimension(
@@ -329,70 +213,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
      */
     private fun installMouseHandlers() {
 
-        addMouseWheelListener { event ->
-
-            if (layout == null || event.preciseWheelRotation == 0.0) {
-                return@addMouseWheelListener
-            }
-
-            event.consume()
-
-            val viewport = SwingUtilities.getAncestorOfClass(
-                JViewport::class.java,
-                this
-            ) as? JViewport
-
-            val previousZoom = zoom
-
-            val rotation = event.preciseWheelRotation
-
-            val multiplier = (1.0 + DiagramInteractionConstants.ZOOM_STEP).pow(-rotation)
-
-            val requestedZoom = (zoom * multiplier)
-                .coerceIn(DiagramInteractionConstants.MIN_ZOOM, DiagramInteractionConstants.MAX_ZOOM)
-
-            if (requestedZoom == previousZoom) {
-                return@addMouseWheelListener
-            }
-
-            // Координаты мыши относительно самой диаграммы.
-            val anchor = event.point
-
-            val previousViewPosition =
-                viewport?.viewPosition ?: Point(0, 0)
-
-            setZoom(requestedZoom)
-
-            if (viewport != null) {
-
-                val ratio = zoom / previousZoom
-
-                // Сохраняем точку диаграммы под курсором.
-                val newX = (
-                        anchor.x * ratio -
-                                (anchor.x - previousViewPosition.x)
-                        ).toInt()
-
-                val newY = (
-                        anchor.y * ratio -
-                                (anchor.y - previousViewPosition.y)
-                        ).toInt()
-
-                val extent = viewport.extentSize
-                val size = preferredSize
-
-                viewport.viewPosition = Point(
-                    newX.coerceIn(
-                        0,
-                        (size.width - extent.width).coerceAtLeast(0)
-                    ),
-                    newY.coerceIn(
-                        0,
-                        (size.height - extent.height).coerceAtLeast(0)
-                    )
-                )
-            }
-        }
+        addMouseWheelListener(zoomController::handleWheel)
 
         addMouseListener(
             object : MouseAdapter() {
@@ -418,14 +239,14 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                 override fun mousePressed(event: MouseEvent) {
                     requestFocusInWindow()
                     if (spacePressed) {
-                        startPanning(event)
+                        panController.startPanning(event)
                     }
                 }
 
                 /** Завершает перемещение холста после отпускания кнопки мыши. */
                 override fun mouseReleased(event: MouseEvent) {
                     if (panning) {
-                        stopPanning()
+                        panController.stopPanning()
                     }
                 }
             }
@@ -446,7 +267,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                 /** Перемещает холст во время перетаскивания. */
                 override fun mouseDragged(event: MouseEvent) {
                     if (panning) {
-                        handlePanning(event)
+                        panController.handlePanning(event)
                     }
                 }
             }
@@ -1208,138 +1029,16 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     // Zoom
     // -------------------------------------------------------------------------
 
-    /**
-     * Устанавливает масштаб в допустимых пределах.
-     */
-    private fun setZoom(
-        value: Double
-    ) {
-
-        zoom =
-            value.coerceIn(
-                DiagramInteractionConstants.MIN_ZOOM,
-                DiagramInteractionConstants.MAX_ZOOM
-            )
-
-        updatePreferredSize()
-
-        revalidate()
-        repaint()
-
-        zoomChangedListener
-            ?.invoke(zoom)
-    }
-
-    /**
-     * Пересчитывает размер Swing-панели с учётом масштаба.
-     */
-    private fun updatePreferredSize() {
-
-        val currentLayout =
-            layout ?: return
-
-        preferredSize =
-            Dimension(
-                (
-                        currentLayout.size.width *
-                                zoom
-                        )
-                    .toInt(),
-
-                (
-                        currentLayout.size.height *
-                                zoom
-                        )
-                    .toInt()
-            )
-    }
-
     /** Подключает обработчик клавиатуры при добавлении панели в UI. */
     override fun addNotify() {
         super.addNotify()
-
-        KeyboardFocusManager
-            .getCurrentKeyboardFocusManager()
-            .addKeyEventDispatcher(spaceKeyDispatcher)
+        keyboardHandler.attach()
     }
 
-    /** Отключает обработчик клавиатуры при удалении панели из UI. */
+    /** Освобождает обработчик клавиатуры при удалении панели. */
     override fun removeNotify() {
-        KeyboardFocusManager
-            .getCurrentKeyboardFocusManager()
-            .removeKeyEventDispatcher(spaceKeyDispatcher)
-
-        spacePressed = false
-        stopPanning()
-
+        keyboardHandler.detach()
         super.removeNotify()
-    }
-
-    /** Запоминает положение мыши и начинает перемещение видимой области. */
-    private fun startPanning(event: MouseEvent) {
-        if (!spacePressed || layout == null) {
-            return
-        }
-
-        if (event.button != MouseEvent.BUTTON1) {
-            return
-        }
-
-        panning = true
-        dragDistance = 0
-        lastDragScreenPoint = event.locationOnScreen
-
-        cursor = panCursor
-    }
-
-    /** Смещает видимую область согласно движению мыши. */
-    private fun handlePanning(event: MouseEvent) {
-        if (!panning) {
-            return
-        }
-
-        val viewport = SwingUtilities.getAncestorOfClass(
-            JViewport::class.java,
-            this
-        ) as? JViewport ?: return
-
-        val previousPoint = lastDragScreenPoint ?: return
-        val currentPoint = event.locationOnScreen
-
-        val dx = currentPoint.x - previousPoint.x
-        val dy = currentPoint.y - previousPoint.y
-
-        if (dx == 0 && dy == 0) {
-            return
-        }
-
-        dragDistance += kotlin.math.abs(dx) + kotlin.math.abs(dy)
-
-        val currentPosition = viewport.viewPosition
-        val extent = viewport.extentSize
-        val viewSize = viewport.viewSize
-
-        val maxX = (viewSize.width - extent.width).coerceAtLeast(0)
-        val maxY = (viewSize.height - extent.height).coerceAtLeast(0)
-
-        viewport.viewPosition = Point(
-            (currentPosition.x - dx).coerceIn(0, maxX),
-            (currentPosition.y - dy).coerceIn(0, maxY)
-        )
-
-        lastDragScreenPoint = currentPoint
-    }
-
-    /** Завершает перемещение холста и восстанавливает курсор. */
-    private fun stopPanning() {
-        panning = false
-        lastDragScreenPoint = null
-
-        cursor = if (spacePressed) {
-            Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
-        } else {
-            Cursor.getDefaultCursor()
-        }
     }
 
     // -------------------------------------------------------------------------
