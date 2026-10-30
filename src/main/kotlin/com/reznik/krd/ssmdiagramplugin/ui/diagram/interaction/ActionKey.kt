@@ -1,7 +1,5 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction
 
-
-
 /**
  * Однозначно идентифицирует action по переходу и индексу внутри него.
  */

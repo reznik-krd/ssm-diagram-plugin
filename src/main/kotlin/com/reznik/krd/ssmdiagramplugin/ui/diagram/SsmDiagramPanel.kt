@@ -7,7 +7,6 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.builder.DiagramGraphBuilder
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.ActionHitArea
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.ActionKey
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramHitRegistry
-import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramInteractionConstants
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramInteractionState
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramZoomController
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramPanController
@@ -21,17 +20,17 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.render.DiagramRenderer
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.transform.ReadableGraphTransformer
 import com.intellij.openapi.project.Project
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramNavigator
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramHitTester
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramSelectionController
 import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.Graphics
 import java.awt.Graphics2D
-import java.awt.Point
 import java.awt.RenderingHints
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import javax.swing.JPanel
-import kotlin.math.sqrt
 
 /**
  * Swing-панель интерактивной диаграммы: отображение, zoom, hit testing, выбор и навигация.
@@ -45,6 +44,8 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private val hitRegistry = DiagramHitRegistry()
     private val navigator = DiagramNavigator(project)
     private val renderer = DiagramRenderer(interaction, hitRegistry)
+    private val hitTester = DiagramHitTester({ graph }, { layout }, { zoom }, hitRegistry)
+    private val selectionController = DiagramSelectionController(interaction) { repaint() }
 
     private var graph: DiagramGraph? = null
     private var layout: DiagramLayout? = null
@@ -94,22 +95,10 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     fun setModel(
         model: StateMachineModel
     ) {
-
-        val logicalGraph =
-            graphBuilder.build(model)
-
-        val visualGraph =
-            graphTransformer.transform(
-                logicalGraph
-            )
-
-        graph =
-            visualGraph
-
-        layout =
-            layoutEngine.layout(
-                visualGraph
-            )
+        val logicalGraph = graphBuilder.build(model)
+        val visualGraph = graphTransformer.transform(logicalGraph)
+        graph = visualGraph
+        layout = layoutEngine.layout(visualGraph)
 
         interaction.clear()
         hitRegistry.clear()
@@ -124,29 +113,14 @@ class SsmDiagramPanel(project: Project) : JPanel() {
      * Сбрасывает текущее состояние объекта.
      */
     fun clear() {
-
         panController.reset()
-
-        graph =
-            null
-
-        layout =
-            null
-
+        graph = null
+        layout = null
         interaction.clear()
         hitRegistry.clear()
-
         zoomController.resetState()
-
-        preferredSize =
-            Dimension(
-                0,
-                0
-            )
-
-        cursor =
-            Cursor.getDefaultCursor()
-
+        preferredSize = Dimension(0, 0)
+        cursor = Cursor.getDefaultCursor()
         revalidate()
         repaint()
     }
@@ -161,22 +135,12 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     override fun paintComponent(
         graphics: Graphics
     ) {
-
-        super.paintComponent(
-            graphics
-        )
-
-        val currentGraph =
-            graph ?: return
-
-        val currentLayout =
-            layout ?: return
-
-        val g2 =
-            graphics.create() as Graphics2D
+        super.paintComponent(graphics)
+        val currentGraph = graph ?: return
+        val currentLayout = layout ?: return
+        val g2 = graphics.create() as Graphics2D
 
         try {
-
             g2.setRenderingHint(
                 RenderingHints.KEY_ANTIALIASING,
                 RenderingHints.VALUE_ANTIALIAS_ON
@@ -187,19 +151,10 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                 RenderingHints.VALUE_TEXT_ANTIALIAS_ON
             )
 
-            g2.scale(
-                zoom,
-                zoom
-            )
+            g2.scale(zoom, zoom)
 
-            renderer.render(
-                g2,
-                currentGraph,
-                currentLayout
-            )
-
+            renderer.render(g2, currentGraph, currentLayout)
         } finally {
-
             g2.dispose()
         }
     }
@@ -212,9 +167,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
      * Подключает обработчики мыши для zoom, hover и кликов.
      */
     private fun installMouseHandlers() {
-
         addMouseWheelListener(zoomController::handleWheel)
-
         addMouseListener(
             object : MouseAdapter() {
 
@@ -284,95 +237,44 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         /*
          * 1. Action.
          */
-        val actionArea =
-            findActionAt(
-                event.x,
-                event.y
-            )
+        val actionArea = findActionAt(event.x, event.y)
+        val action = actionArea?.let(::findAction)
 
-        val action =
-            actionArea
-                ?.let(::findAction)
-
-        if (
-            actionArea != null &&
-            action?.action?.targetClass != null
-        ) {
-
-            updateHover(
-                action =
-                    ActionKey(
-                        actionArea.edgeId,
-                        actionArea.actionIndex
-                    )
-            )
-
+        if (actionArea != null && action?.action?.targetClass != null) {
+            updateHover(action = ActionKey(actionArea.edgeId, actionArea.actionIndex))
             return
         }
 
         /*
          * 2. Event.
          */
-        val eventEdge =
-            findEventEdgeAt(
-                event.x,
-                event.y
-            )
+        val eventEdge = findEventEdgeAt(event.x, event.y)
 
-        if (
-            eventEdge != null &&
-            eventEdge.eventElement != null
-        ) {
-
-            updateHover(
-                eventEdgeId =
-                    eventEdge.id
-            )
-
+        if (eventEdge != null && eventEdge.eventElement != null) {
+            updateHover(eventEdgeId = eventEdge.id)
             return
         }
 
         /*
          * 3. Guard.
          */
-        val guardEdge =
-            findGuardEdgeAt(
-                event.x,
-                event.y
-            )
+        val guardEdge = findGuardEdgeAt(event.x, event.y)
 
-        if (
-            guardEdge != null &&
-            guardEdge.guard?.targetClass != null
-        ) {
-
-            updateHover(
-                guardEdgeId =
-                    guardEdge.id
-            )
-
+        if (guardEdge != null && guardEdge.guard?.targetClass != null) {
+            updateHover(guardEdgeId = guardEdge.id)
             return
         }
 
         /*
          * 4. State.
          */
-        val node =
-            findNodeAt(
-                event.x,
-                event.y
-            )
+        val node = findNodeAt(event.x, event.y)
                 ?.takeIf {
                     it.state?.source != null
                 }
 
         if (node != null) {
-
-            updateHover(
-                nodeId =
-                    node.id
-            )
-
+            updateHover(nodeId = node.id)
             return
         }
 
@@ -382,21 +284,11 @@ class SsmDiagramPanel(project: Project) : JPanel() {
          * Edge hover does not change selection,
          * but cursor tells the user it is clickable.
          */
-        val edge =
-            findDiagramEdgeAt(
-                event.x,
-                event.y
-            )
-
+        val edge = findDiagramEdgeAt(event.x, event.y)
         if (edge != null) {
-
-            updateHover(
-                clickable = true
-            )
-
+            updateHover(clickable = true)
             return
         }
-
         updateHover(
             clickable = false
         )
@@ -416,23 +308,18 @@ class SsmDiagramPanel(project: Project) : JPanel() {
             return
         }
 
-        val changed =
-            interaction.hoveredNodeId != nodeId ||
+        val changed = interaction.hoveredNodeId != nodeId ||
                     interaction.hoveredEventEdgeId != eventEdgeId ||
                     interaction.hoveredGuardEdgeId != guardEdgeId ||
                     interaction.hoveredAction != action
 
-        interaction.hoveredNodeId =
-            nodeId
+        interaction.hoveredNodeId = nodeId
 
-        interaction.hoveredEventEdgeId =
-            eventEdgeId
+        interaction.hoveredEventEdgeId = eventEdgeId
 
-        interaction.hoveredGuardEdgeId =
-            guardEdgeId
+        interaction.hoveredGuardEdgeId = guardEdgeId
 
-        interaction.hoveredAction =
-            action
+        interaction.hoveredAction = action
 
         cursor =
             if (clickable) {
@@ -453,21 +340,9 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         if (spacePressed || panning) {
             return
         }
-
-        val changed =
-            interaction.hasHover()
-
-        /*
-         * Important:
-         *
-         * mouse exit clears only hover.
-         * Selected state/edge must remain selected.
-         */
+        val changed = interaction.hasHover()
         interaction.clearHover()
-
-        cursor =
-            Cursor.getDefaultCursor()
-
+        cursor = Cursor.getDefaultCursor()
         if (changed) {
             repaint()
         }
@@ -480,74 +355,46 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     /**
      * Обрабатывает навигацию и выбор элемента по клику.
      */
-    private fun handleMouseClick(
-        event: MouseEvent
-    ) {
-
-        if (
-            event.button !=
-            MouseEvent.BUTTON1
-        ) {
+    private fun handleMouseClick(event: MouseEvent) {
+        if (event.button != MouseEvent.BUTTON1) {
             return
         }
 
         /*
          * 1. Action navigation.
          */
-        val actionClass =
-            findActionAt(
-                event.x,
-                event.y
-            )
+        val actionClass = findActionAt(event.x, event.y)
                 ?.let(::findAction)
                 ?.action
                 ?.targetClass
 
         if (actionClass != null) {
-
-            navigator.navigateTo(
-                actionClass
-            )
-
+            navigator.navigateTo(actionClass)
             return
         }
 
         /*
          * 2. Event navigation.
          */
-        val eventElement =
-            findEventEdgeAt(
-                event.x,
-                event.y
-            )
+        val eventElement = findEventEdgeAt(event.x, event.y)
                 ?.eventElement
 
         if (eventElement != null) {
-
             navigator.navigateTo(
                 eventElement
             )
-
             return
         }
 
         /*
          * 3. Guard navigation.
          */
-        val guardClass =
-            findGuardEdgeAt(
-                event.x,
-                event.y
-            )
+        val guardClass = findGuardEdgeAt(event.x, event.y)
                 ?.guard
                 ?.targetClass
 
         if (guardClass != null) {
-
-            navigator.navigateTo(
-                guardClass
-            )
-
+            navigator.navigateTo(guardClass)
             return
         }
 
@@ -557,47 +404,24 @@ class SsmDiagramPanel(project: Project) : JPanel() {
          * State has priority over edge because
          * an edge can visually pass behind a node.
          */
-        val node =
-            findNodeAt(
-                event.x,
-                event.y
-            )
-
-        if (
-            node != null &&
-            node.state?.source != null
-        ) {
-
-            selectNode(
-                node
-            )
+        val node = findNodeAt(event.x, event.y)
+        if (node != null && node.state?.source != null) {
+            selectNode(node)
 
             /*
              * Existing behavior:
              * navigate directly to enum constant.
              */
-            navigator.navigateTo(
-                node.state.source
-            )
-
+            navigator.navigateTo(node.state.source)
             return
         }
 
         /*
          * 5. Edge selection.
          */
-        val edge =
-            findDiagramEdgeAt(
-                event.x,
-                event.y
-            )
-
+        val edge = findDiagramEdgeAt(event.x, event.y)
         if (edge != null) {
-
-            selectEdge(
-                edge
-            )
-
+            selectEdge(edge)
             return
         }
 
@@ -616,83 +440,19 @@ class SsmDiagramPanel(project: Project) : JPanel() {
      */
     private fun selectNode(
         node: DiagramNode
-    ) {
-
-        val logicalId =
-            node.logicalId
-
-        /*
-         * Repeated click toggles selection off.
-         */
-        interaction.selectedNodeLogicalId =
-            if (
-                interaction.selectedNodeLogicalId ==
-                logicalId
-            ) {
-                null
-            } else {
-                logicalId
-            }
-
-        /*
-         * State selection and explicit edge selection
-         * are mutually exclusive.
-         */
-        interaction.selectedEdgeId =
-            null
-
-        repaint()
-    }
+    ) = selectionController.selectNode(node)
 
     /**
      * Выбирает конкретный переход диаграммы.
      */
     private fun selectEdge(
         edge: DiagramEdge
-    ) {
-
-        /*
-         * Repeated click toggles selection off.
-         */
-        interaction.selectedEdgeId =
-            if (
-                interaction.selectedEdgeId ==
-                edge.id
-            ) {
-                null
-            } else {
-                edge.id
-            }
-
-        /*
-         * Explicit transition selection disables
-         * logical state selection.
-         */
-        interaction.selectedNodeLogicalId =
-            null
-
-        repaint()
-    }
+    ) = selectionController.selectEdge(edge)
 
     /**
      * Сбрасывает выбранное состояние или переход.
      */
-    private fun clearSelection() {
-
-        val changed =
-            interaction.selectedEdgeId != null ||
-                    interaction.selectedNodeLogicalId != null
-
-        interaction.selectedEdgeId =
-            null
-
-        interaction.selectedNodeLogicalId =
-            null
-
-        if (changed) {
-            repaint()
-        }
-    }
+    private fun clearSelection() = selectionController.clearSelection()
 
     // -------------------------------------------------------------------------
     // Hit testing
@@ -704,41 +464,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private fun findNodeAt(
         mouseX: Int,
         mouseY: Int
-    ): DiagramNode? {
-
-        val currentGraph =
-            graph ?: return null
-
-        val currentLayout =
-            layout ?: return null
-
-        val diagramX =
-            (mouseX / zoom)
-                .toInt()
-
-        val diagramY =
-            (mouseY / zoom)
-                .toInt()
-
-        return currentGraph.nodes
-            .firstOrNull { node ->
-
-                val nodeLayout =
-                    currentLayout.nodes[
-                        node.id
-                    ]
-                        ?: return@firstOrNull false
-
-                diagramX >= nodeLayout.x &&
-                        diagramX <=
-                        nodeLayout.x +
-                        nodeLayout.width &&
-                        diagramY >= nodeLayout.y &&
-                        diagramY <=
-                        nodeLayout.y +
-                        nodeLayout.height
-            }
-    }
+    ): DiagramNode? = hitTester.findNodeAt(mouseX, mouseY)
 
     /**
      * Находит кликабельную область action в координатах мыши.
@@ -746,48 +472,14 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private fun findActionAt(
         mouseX: Int,
         mouseY: Int
-    ): ActionHitArea? {
-
-        val diagramX =
-            (mouseX / zoom)
-                .toInt()
-
-        val diagramY =
-            (mouseY / zoom)
-                .toInt()
-
-        return hitRegistry.actionAreas
-            .lastOrNull { area ->
-                area.bounds.contains(
-                    diagramX,
-                    diagramY
-                )
-            }
-    }
+    ): ActionHitArea? = hitTester.findActionAt(mouseX, mouseY)
 
     /**
      * Находит модель action по зарегистрированной hit-area.
      */
     private fun findAction(
         area: ActionHitArea
-    ): SsmAction? {
-
-        val currentGraph =
-            graph ?: return null
-
-        val edge =
-            currentGraph.edges
-                .firstOrNull {
-                    it.id ==
-                            area.edgeId
-                }
-                ?: return null
-
-        return edge.actions
-            .getOrNull(
-                area.actionIndex
-            )
-    }
+    ): SsmAction? = hitTester.findAction(area)
 
     /**
      * Находит переход по области подписи event.
@@ -795,36 +487,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private fun findEventEdgeAt(
         mouseX: Int,
         mouseY: Int
-    ): DiagramEdge? {
-
-        val currentGraph =
-            graph ?: return null
-
-        val diagramX =
-            (mouseX / zoom)
-                .toInt()
-
-        val diagramY =
-            (mouseY / zoom)
-                .toInt()
-
-        val edgeId =
-            hitRegistry.eventAreas
-                .entries
-                .lastOrNull { (_, bounds) ->
-                    bounds.contains(
-                        diagramX,
-                        diagramY
-                    )
-                }
-                ?.key
-                ?: return null
-
-        return currentGraph.edges
-            .firstOrNull {
-                it.id == edgeId
-            }
-    }
+    ): DiagramEdge? = hitTester.findEventEdgeAt(mouseX, mouseY)
 
     /**
      * Находит переход по области подписи guard.
@@ -832,36 +495,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private fun findGuardEdgeAt(
         mouseX: Int,
         mouseY: Int
-    ): DiagramEdge? {
-
-        val currentGraph =
-            graph ?: return null
-
-        val diagramX =
-            (mouseX / zoom)
-                .toInt()
-
-        val diagramY =
-            (mouseY / zoom)
-                .toInt()
-
-        val edgeId =
-            hitRegistry.guardAreas
-                .entries
-                .lastOrNull { (_, bounds) ->
-                    bounds.contains(
-                        diagramX,
-                        diagramY
-                    )
-                }
-                ?.key
-                ?: return null
-
-        return currentGraph.edges
-            .firstOrNull {
-                it.id == edgeId
-            }
-    }
+    ): DiagramEdge? = hitTester.findGuardEdgeAt(mouseX, mouseY)
 
     /**
      * Находит ребро рядом с указанной точкой диаграммы.
@@ -869,161 +503,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private fun findDiagramEdgeAt(
         mouseX: Int,
         mouseY: Int
-    ): DiagramEdge? {
-
-        val currentGraph =
-            graph ?: return null
-
-        val currentLayout =
-            layout ?: return null
-
-        val diagramX =
-            mouseX / zoom
-
-        val diagramY =
-            mouseY / zoom
-
-        /*
-         * Keep click tolerance visually similar
-         * at every zoom level.
-         */
-        val tolerance =
-            DiagramInteractionConstants.EDGE_CLICK_TOLERANCE /
-                    zoom
-
-        return currentGraph.edges
-            .mapNotNull { edge ->
-
-                val edgeLayout =
-                    currentLayout.edges[
-                        edge.id
-                    ]
-                        ?: return@mapNotNull null
-
-                val distance =
-                    edgeLayout.points
-                        .zipWithNext()
-                        .minOfOrNull {
-                                (start, end) ->
-
-                            distanceToSegment(
-                                px = diagramX,
-                                py = diagramY,
-                                start = start,
-                                end = end
-                            )
-                        }
-                        ?: return@mapNotNull null
-
-                edge to distance
-            }
-            .filter {
-                    (_, distance) ->
-                distance <= tolerance
-            }
-            .minByOrNull {
-                    (_, distance) ->
-                distance
-            }
-            ?.first
-    }
-
-    /**
-     * Вычисляет расстояние от точки до отрезка для hit testing ребра.
-     */
-    private fun distanceToSegment(
-        px: Double,
-        py: Double,
-        start: Point,
-        end: Point
-    ): Double {
-
-        val dx =
-            (
-                    end.x -
-                            start.x
-                    )
-                .toDouble()
-
-        val dy =
-            (
-                    end.y -
-                            start.y
-                    )
-                .toDouble()
-
-        if (
-            dx == 0.0 &&
-            dy == 0.0
-        ) {
-
-            val pointDx =
-                px -
-                        start.x
-
-            val pointDy =
-                py -
-                        start.y
-
-            return sqrt(
-                pointDx *
-                        pointDx +
-                        pointDy *
-                        pointDy
-            )
-        }
-
-        val t =
-            (
-                    (
-                            px -
-                                    start.x
-                            ) *
-                            dx +
-                            (
-                                    py -
-                                            start.y
-                                    ) *
-                            dy
-                    ) /
-                    (
-                            dx *
-                                    dx +
-                                    dy *
-                                    dy
-                            )
-
-        val clampedT =
-            t.coerceIn(
-                0.0,
-                1.0
-            )
-
-        val closestX =
-            start.x +
-                    clampedT *
-                    dx
-
-        val closestY =
-            start.y +
-                    clampedT *
-                    dy
-
-        val distanceX =
-            px -
-                    closestX
-
-        val distanceY =
-            py -
-                    closestY
-
-        return sqrt(
-            distanceX *
-                    distanceX +
-                    distanceY *
-                    distanceY
-        )
-    }
+    ): DiagramEdge? = hitTester.findDiagramEdgeAt(mouseX, mouseY)
 
     // -------------------------------------------------------------------------
     // Zoom

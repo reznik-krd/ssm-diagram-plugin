@@ -20,9 +20,7 @@ class GenerateSsmDiagramAction : AnAction() {
      */
     override fun actionPerformed(event: AnActionEvent) {
         val project = event.project ?: return
-
         val virtualFile = event.getData(CommonDataKeys.VIRTUAL_FILE) ?: return
-
         val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
 
         if (psiFile !is PsiJavaFile) {

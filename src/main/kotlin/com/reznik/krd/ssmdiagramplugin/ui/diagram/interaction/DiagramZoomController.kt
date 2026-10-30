@@ -58,27 +58,13 @@ internal class DiagramZoomController(
 
         val availableWidth = (viewportSize.width - DiagramInteractionConstants.FIT_PADDING).coerceAtLeast(1)
 
-        val availableHeight =
-            (
-                    viewportSize.height -
-                            DiagramInteractionConstants.FIT_PADDING
-                    )
+        val availableHeight = (viewportSize.height - DiagramInteractionConstants.FIT_PADDING)
                 .coerceAtLeast(1)
 
-        val widthZoom =
-            availableWidth.toDouble() /
-                    currentLayout.size.width
+        val widthZoom = availableWidth.toDouble() / currentLayout.size.width
+        val heightZoom = availableHeight.toDouble() / currentLayout.size.height
 
-        val heightZoom =
-            availableHeight.toDouble() /
-                    currentLayout.size.height
-
-        setZoom(
-            minOf(
-                widthZoom,
-                heightZoom
-            )
-        )
+        setZoom(minOf(widthZoom, heightZoom))
     }
 
     /** Изменяет масштаб колесом и сохраняет положение точки под курсором. */
@@ -118,46 +104,24 @@ internal class DiagramZoomController(
     /**
      * Устанавливает масштаб в допустимых пределах.
      */
-    private fun setZoom(
-        value: Double
-    ) {
-
-        zoom =
-            value.coerceIn(
-                DiagramInteractionConstants.MIN_ZOOM,
-                DiagramInteractionConstants.MAX_ZOOM
-            )
-
+    private fun setZoom(value: Double) {
+        zoom = value.coerceIn(DiagramInteractionConstants.MIN_ZOOM, DiagramInteractionConstants.MAX_ZOOM)
         updatePreferredSize()
-
         panel.revalidate()
         panel.repaint()
-
-        zoomChangedListener
-            ?.invoke(zoom)
+        zoomChangedListener?.invoke(zoom)
     }
 
     /**
      * Пересчитывает размер Swing-панели с учётом масштаба.
      */
     fun updatePreferredSize() {
-
-        val currentLayout =
-            layoutProvider() ?: return
+        val currentLayout = layoutProvider() ?: return
 
         panel.preferredSize =
             Dimension(
-                (
-                        currentLayout.size.width *
-                                zoom
-                        )
-                    .toInt(),
-
-                (
-                        currentLayout.size.height *
-                                zoom
-                        )
-                    .toInt()
+                (currentLayout.size.width * zoom).toInt(),
+                (currentLayout.size.height * zoom).toInt()
             )
     }
 

@@ -13,32 +13,17 @@ data class NodeLayout(
 ) {
 
     val top: Point
-        get() = Point(
-            x + width / 2,
-            y
-        )
+        get() = Point(x + width / 2, y)
 
     val bottom: Point
-        get() = Point(
-            x + width / 2,
-            y + height
-        )
+        get() = Point(x + width / 2, y + height)
 
     val left: Point
-        get() = Point(
-            x,
-            y + height / 2
-        )
+        get() = Point(x, y + height / 2)
 
     val right: Point
-        get() = Point(
-            x + width,
-            y + height / 2
-        )
+        get() = Point(x + width, y + height / 2)
 
     val center: Point
-        get() = Point(
-            x + width / 2,
-            y + height / 2
-        )
+        get() = Point(x + width / 2, y + height / 2)
 }
