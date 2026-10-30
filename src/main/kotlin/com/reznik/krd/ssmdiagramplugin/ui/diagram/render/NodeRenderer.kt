@@ -165,13 +165,13 @@ internal class NodeRenderer(
                 when {
 
                     selected ->
-                        SELECTED_NODE_WIDTH
+                        NodeRenderDimensions.SELECTED_NODE_WIDTH
 
                     hovered ->
-                        HOVER_NODE_WIDTH
+                        NodeRenderDimensions.HOVER_NODE_WIDTH
 
                     else ->
-                        NORMAL_NODE_WIDTH
+                        NodeRenderDimensions.NORMAL_NODE_WIDTH
                 }
             )
 
@@ -288,13 +288,13 @@ internal class NodeRenderer(
                 when {
 
                     selected ->
-                        SELECTED_NODE_WIDTH
+                        NodeRenderDimensions.SELECTED_NODE_WIDTH
 
                     hovered ->
-                        HOVER_NODE_WIDTH
+                        NodeRenderDimensions.HOVER_NODE_WIDTH
 
                     else ->
-                        NORMAL_NODE_WIDTH
+                        NodeRenderDimensions.NORMAL_NODE_WIDTH
                 }
             )
 
@@ -407,9 +407,9 @@ internal class NodeRenderer(
         g2.stroke =
             BasicStroke(
                 if (selected) {
-                    SELECTED_NODE_WIDTH
+                    NodeRenderDimensions.SELECTED_NODE_WIDTH
                 } else {
-                    NORMAL_NODE_WIDTH
+                    NodeRenderDimensions.NORMAL_NODE_WIDTH
                 }
             )
 
@@ -428,19 +428,4 @@ internal class NodeRenderer(
         )
     }
 
-    // -------------------------------------------------------------------------
-    // Style
-    // -------------------------------------------------------------------------
-
-    private companion object {
-
-        const val NORMAL_NODE_WIDTH =
-            1.4f
-
-        const val HOVER_NODE_WIDTH =
-            2.2f
-
-        const val SELECTED_NODE_WIDTH =
-            3.0f
-    }
 }

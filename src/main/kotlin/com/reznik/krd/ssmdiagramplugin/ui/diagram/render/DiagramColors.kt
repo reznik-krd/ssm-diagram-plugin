@@ -3,6 +3,7 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.render
 import com.intellij.ui.JBColor
 import java.awt.Color
 
+/** Цветовая палитра диаграммы для светлой и тёмной тем IntelliJ IDEA. */
 internal object DiagramColors {
 
     // State — Green

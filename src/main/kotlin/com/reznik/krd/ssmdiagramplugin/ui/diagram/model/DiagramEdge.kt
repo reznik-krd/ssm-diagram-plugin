@@ -21,6 +21,7 @@ data class DiagramEdge(
     val actions: List<SsmAction> = emptyList()
 ) {
 
+    /** Допустимые разновидности элемента модели. */
     enum class Type {
         TRANSITION,
         CHOICE_BRANCH,

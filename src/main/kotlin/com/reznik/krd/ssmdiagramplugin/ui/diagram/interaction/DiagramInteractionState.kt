@@ -20,6 +20,7 @@ class DiagramInteractionState {
         selectedNodeLogicalId = null
     }
 
+    /** Проверяет, подсвечен ли сейчас какой-либо элемент диаграммы. */
     fun hasHover(): Boolean =
         hoveredNodeId != null ||
                 hoveredEventEdgeId != null ||
@@ -36,11 +37,3 @@ class DiagramInteractionState {
         hoveredAction = null
     }
 }
-
-/**
- * Однозначно идентифицирует action по переходу и индексу внутри него.
- */
-data class ActionKey(
-    val edgeId: String,
-    val actionIndex: Int
-)

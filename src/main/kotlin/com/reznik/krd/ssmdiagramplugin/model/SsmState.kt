@@ -10,6 +10,7 @@ data class SsmState(
     val type: Type,
     val source: PsiElement? = null
 ) {
+    /** Допустимые разновидности элемента модели. */
     enum class Type {
         INITIAL,
         NORMAL,

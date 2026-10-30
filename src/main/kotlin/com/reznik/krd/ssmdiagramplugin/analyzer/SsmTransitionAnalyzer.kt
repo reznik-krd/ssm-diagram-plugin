@@ -37,6 +37,7 @@ class SsmTransitionAnalyzer {
         return transitions
     }
 
+    /** Разбирает внешний переход конфигурации Spring StateMachine. */
     private fun parseExternalTransition(withExternal: PsiMethodCallExpression): List<SsmTransition> {
         /*
          * Собираем ТОЛЬКО текущий transition.
@@ -128,6 +129,7 @@ class SsmTransitionAnalyzer {
         }
     }
 
+    /** Извлекает action из выражения конфигурации перехода. */
     private fun parseAction(call: PsiMethodCallExpression): SsmAction? {
         val arguments = call.argumentList.expressions
         val actionExpression = arguments.getOrNull(0) ?: return null
@@ -140,10 +142,12 @@ class SsmTransitionAnalyzer {
         )
     }
 
+    /** Преобразует выражение PSI в разрешённое значение. */
     private fun resolve(expression: PsiExpression): List<ResolvedValue> {
         return expressionResolver.resolve(expression)
     }
 
+    /** Получает имя одного элемента выражения. */
     private fun resolveSingleName(expression: PsiExpression): String? {
         return expressionResolver
             .resolve(expression)
@@ -152,6 +156,7 @@ class SsmTransitionAnalyzer {
             ?: resolveReferenceName(expression)
     }
 
+    /** Определяет имя ссылки на компонент. */
     private fun resolveReferenceName(expression: PsiExpression): String? {
         return when (expression) {
             is PsiReferenceExpression -> expression.referenceName

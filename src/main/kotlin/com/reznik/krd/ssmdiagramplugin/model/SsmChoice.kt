@@ -10,20 +10,3 @@ data class SsmChoice(
     val branches: List<SsmChoiceBranch>,
     val sourceElement: PsiElement? = null
 )
-
-/**
- * Описывает одну ветвь choice-перехода с целью, guard и actions.
- */
-data class SsmChoiceBranch(
-    val target: String,
-    val type: Type,
-    val guard: SsmComponentReference? = null,
-    val actions: List<SsmAction> = emptyList(),
-    val targetElement: PsiElement? = null
-) {
-    enum class Type {
-        FIRST,
-        THEN,
-        LAST
-    }
-}

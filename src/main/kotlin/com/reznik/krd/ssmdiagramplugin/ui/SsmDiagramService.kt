@@ -37,6 +37,7 @@ class SsmDiagramService {
     }
 
     companion object {
+        /** Возвращает сервис диаграммы для указанного проекта. */
         fun getInstance(project: Project): SsmDiagramService {
             return project.getService(SsmDiagramService::class.java)
         }

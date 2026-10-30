@@ -7,6 +7,7 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.builder.DiagramGraphBuilder
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.ActionHitArea
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.ActionKey
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramHitRegistry
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramInteractionConstants
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramInteractionState
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.layout.DiagramLayout
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.layout.HierarchicalLayoutEngine
@@ -51,7 +52,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
 
     private var graph: DiagramGraph? = null
     private var layout: DiagramLayout? = null
-    private var zoom = DEFAULT_ZOOM
+    private var zoom = DiagramInteractionConstants.DEFAULT_ZOOM
     private var zoomChangedListener: ((Double) -> Unit)? = null
 
     private var spacePressed = false
@@ -141,17 +142,17 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     /**
      * Увеличивает масштаб диаграммы.
      */
-    fun zoomIn() = setZoom(zoom + ZOOM_STEP)
+    fun zoomIn() = setZoom(zoom + DiagramInteractionConstants.ZOOM_STEP)
 
     /**
      * Уменьшает масштаб диаграммы.
      */
-    fun zoomOut() = setZoom(zoom - ZOOM_STEP)
+    fun zoomOut() = setZoom(zoom - DiagramInteractionConstants.ZOOM_STEP)
 
     /**
      * Возвращает масштаб диаграммы к 100%.
      */
-    fun resetZoom() = setZoom(DEFAULT_ZOOM)
+    fun resetZoom() = setZoom(DiagramInteractionConstants.DEFAULT_ZOOM)
 
     /**
      * Подбирает масштаб диаграммы под размер viewport.
@@ -168,12 +169,12 @@ class SsmDiagramPanel(project: Project) : JPanel() {
             return
         }
 
-        val availableWidth = (viewportSize.width - FIT_PADDING).coerceAtLeast(1)
+        val availableWidth = (viewportSize.width - DiagramInteractionConstants.FIT_PADDING).coerceAtLeast(1)
 
         val availableHeight =
             (
                     viewportSize.height -
-                            FIT_PADDING
+                            DiagramInteractionConstants.FIT_PADDING
                     )
                 .coerceAtLeast(1)
 
@@ -248,7 +249,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         hitRegistry.clear()
 
         zoom =
-            DEFAULT_ZOOM
+            DiagramInteractionConstants.DEFAULT_ZOOM
 
         zoomChangedListener
             ?.invoke(zoom)
@@ -345,10 +346,10 @@ class SsmDiagramPanel(project: Project) : JPanel() {
 
             val rotation = event.preciseWheelRotation
 
-            val multiplier = (1.0 + ZOOM_STEP).pow(-rotation)
+            val multiplier = (1.0 + DiagramInteractionConstants.ZOOM_STEP).pow(-rotation)
 
             val requestedZoom = (zoom * multiplier)
-                .coerceIn(MIN_ZOOM, MAX_ZOOM)
+                .coerceIn(DiagramInteractionConstants.MIN_ZOOM, DiagramInteractionConstants.MAX_ZOOM)
 
             if (requestedZoom == previousZoom) {
                 return@addMouseWheelListener
@@ -396,6 +397,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         addMouseListener(
             object : MouseAdapter() {
 
+                /** Обрабатывает щелчок по элементу диаграммы. */
                 override fun mouseClicked(event: MouseEvent) {
                     if (spacePressed || dragDistance > 4) {
                         dragDistance = 0
@@ -405,12 +407,14 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                     handleMouseClick(event)
                 }
 
+                /** Сбрасывает наведение при выходе указателя за диаграмму. */
                 override fun mouseExited(
                     event: MouseEvent
                 ) {
                     clearHover()
                 }
 
+                /** Начинает перемещение холста при нажатии мыши с пробелом. */
                 override fun mousePressed(event: MouseEvent) {
                     requestFocusInWindow()
                     if (spacePressed) {
@@ -418,6 +422,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                     }
                 }
 
+                /** Завершает перемещение холста после отпускания кнопки мыши. */
                 override fun mouseReleased(event: MouseEvent) {
                     if (panning) {
                         stopPanning()
@@ -429,6 +434,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         addMouseMotionListener(
             object : MouseMotionAdapter() {
 
+                /** Обновляет подсветку элемента под указателем. */
                 override fun mouseMoved(event: MouseEvent) {
                     if (spacePressed || panning) {
                         return
@@ -437,6 +443,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
                     handleMouseMove(event)
                 }
 
+                /** Перемещает холст во время перетаскивания. */
                 override fun mouseDragged(event: MouseEvent) {
                     if (panning) {
                         handlePanning(event)
@@ -1060,7 +1067,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
          * at every zoom level.
          */
         val tolerance =
-            EDGE_CLICK_TOLERANCE /
+            DiagramInteractionConstants.EDGE_CLICK_TOLERANCE /
                     zoom
 
         return currentGraph.edges
@@ -1210,8 +1217,8 @@ class SsmDiagramPanel(project: Project) : JPanel() {
 
         zoom =
             value.coerceIn(
-                MIN_ZOOM,
-                MAX_ZOOM
+                DiagramInteractionConstants.MIN_ZOOM,
+                DiagramInteractionConstants.MAX_ZOOM
             )
 
         updatePreferredSize()
@@ -1247,6 +1254,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
             )
     }
 
+    /** Подключает обработчик клавиатуры при добавлении панели в UI. */
     override fun addNotify() {
         super.addNotify()
 
@@ -1255,6 +1263,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
             .addKeyEventDispatcher(spaceKeyDispatcher)
     }
 
+    /** Отключает обработчик клавиатуры при удалении панели из UI. */
     override fun removeNotify() {
         KeyboardFocusManager
             .getCurrentKeyboardFocusManager()
@@ -1266,6 +1275,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         super.removeNotify()
     }
 
+    /** Запоминает положение мыши и начинает перемещение видимой области. */
     private fun startPanning(event: MouseEvent) {
         if (!spacePressed || layout == null) {
             return
@@ -1282,6 +1292,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         cursor = panCursor
     }
 
+    /** Смещает видимую область согласно движению мыши. */
     private fun handlePanning(event: MouseEvent) {
         if (!panning) {
             return
@@ -1319,6 +1330,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         lastDragScreenPoint = currentPoint
     }
 
+    /** Завершает перемещение холста и восстанавливает курсор. */
     private fun stopPanning() {
         panning = false
         lastDragScreenPoint = null
@@ -1336,20 +1348,9 @@ class SsmDiagramPanel(project: Project) : JPanel() {
 
     private companion object {
 
-        const val DEFAULT_ZOOM = 1.0
-
-        const val MIN_ZOOM = 0.25
-
-        const val MAX_ZOOM = 2.5
-
-        const val ZOOM_STEP = 0.10
-
-        const val FIT_PADDING = 40
-
         /*
          * Screen-space pixels.
          */
-        const val EDGE_CLICK_TOLERANCE = 10.0
 
         val HAND_CURSOR: Cursor =
             Cursor.getPredefinedCursor(

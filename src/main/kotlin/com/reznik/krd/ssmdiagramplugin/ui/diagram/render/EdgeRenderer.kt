@@ -138,9 +138,9 @@ internal class EdgeRenderer(
         g2.stroke =
             BasicStroke(
                 if (selected) {
-                    SELECTED_EDGE_WIDTH
+                    EdgeRenderDimensions.SELECTED_EDGE_WIDTH
                 } else {
-                    NORMAL_EDGE_WIDTH
+                    EdgeRenderDimensions.NORMAL_EDGE_WIDTH
                 },
                 BasicStroke.CAP_ROUND,
                 BasicStroke.JOIN_ROUND
@@ -806,20 +806,7 @@ internal class EdgeRenderer(
     // Types / constants
     // -------------------------------------------------------------------------
 
-    private enum class LabelKind {
-        EVENT,
-        GUARD,
-        ACTION
-    }
-
     private companion object {
-
-        const val NORMAL_EDGE_WIDTH =
-            1.4f
-
-        const val SELECTED_EDGE_WIDTH =
-            3.2f
-
         val HOVER_BACKGROUND =
             JBColor(
                 Color(225, 235, 250),
