@@ -2,6 +2,11 @@
 
 All notable changes to SSM Diagram are documented in this file.
 
+## [1.0.12] - 2026-10-30
+
+### Added
+- Refactoring
+
 ## [1.0.11] - 2026-10-30
 
 ### Added
