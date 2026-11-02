@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.reznik.krd"
-version = "1.0.15-SNAPSHOT"
+version = "1.0.16-SNAPSHOT"
 
 repositories {
     mavenCentral()
@@ -14,8 +14,10 @@ repositories {
     }
 }
 
-// Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
+    implementation("org.apache.xmlgraphics:batik-svggen:1.19")
+    implementation("org.apache.xmlgraphics:batik-dom:1.19")
+
     intellijPlatform {
         intellijIdea("2025.2.4")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)

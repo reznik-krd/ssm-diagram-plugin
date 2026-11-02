@@ -55,6 +55,7 @@ class SsmDiagramToolWindowPanel(
     private val fitButton = JButton("Fit")
     private val centerButton = JButton("Center")
     private val exportPlantUmlButton = JButton("Export PlantUML")
+    private val exportSvgButton = JButton("Export SVG")
     private val plantUmlExporter = PlantUmlExporter()
     private val hideGuardsCheckBox = JCheckBox("Hide Guards")
     private val hideActionsCheckBox = JCheckBox("Hide Actions")
@@ -141,6 +142,7 @@ class SsmDiagramToolWindowPanel(
         hideGuardsCheckBox.addActionListener { updateDisplayOptions() }
         hideActionsCheckBox.addActionListener { updateDisplayOptions() }
         exportPlantUmlButton.addActionListener { exportPlantUml() }
+        exportSvgButton.addActionListener { exportSvg() }
     }
 
     /**
@@ -177,6 +179,7 @@ class SsmDiagramToolWindowPanel(
             add(refreshButton)
             add(clearButton)
             add(exportPlantUmlButton)
+            add(exportSvgButton)
         }
 
     /**
@@ -446,6 +449,7 @@ class SsmDiagramToolWindowPanel(
         openConfigButton.isEnabled = !busy && hasSelectedConfig
         refreshButton.isEnabled = !busy && hasDiagram
         exportPlantUmlButton.isEnabled = !busy && hasDiagram
+        exportSvgButton.isEnabled = !busy && hasDiagram
 
         clearButton.isEnabled = hasDiagram
         zoomOutButton.isEnabled = hasDiagram
@@ -552,6 +556,45 @@ class SsmDiagramToolWindowPanel(
      * Сохраняет логическую StateMachine без Guards,
      * Actions и визуальных копий состояний.
      */
+    /** Сохраняет всю текущую диаграмму как SVG без подсветки и масштаба экрана. */
+    private fun exportSvg() {
+        val configPath = displayedConfigPath ?: return
+        val configName = File(configPath).nameWithoutExtension.ifBlank { "StateMachine" }
+        val chooser = JFileChooser().apply {
+            dialogTitle = "Export StateMachine to SVG"
+            dialogType = JFileChooser.SAVE_DIALOG
+            fileFilter = FileNameExtensionFilter("SVG (*.svg)", "svg")
+            selectedFile = File("$configName.svg")
+            project.basePath?.let(::File)?.takeIf { it.isDirectory }?.let { currentDirectory = it }
+        }
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return
+        val chosen = chooser.selectedFile ?: return
+        val destination = if (chosen.extension.equals("svg", ignoreCase = true)) {
+            chosen
+        } else {
+            File(chosen.parentFile, "${chosen.name}.svg")
+        }
+        if (destination.exists()) {
+            val answer = Messages.showYesNoDialog(
+                project,
+                "File ${destination.name} already exists. Overwrite it?",
+                "Export SVG",
+                Messages.getQuestionIcon()
+            )
+            if (answer != Messages.YES) return
+        }
+        try {
+            diagramPanel.exportSvg(destination.toPath())
+            Messages.showInfoMessage(
+                project,
+                "SVG file saved:\n${destination.absolutePath}",
+                "Export SVG"
+            )
+        } catch (exception: Exception) {
+            showError("Failed to export SVG.", exception)
+        }
+    }
+
     private fun exportPlantUml() {
         // После Clear экспорт недоступен.
         val configPath = displayedConfigPath ?: return

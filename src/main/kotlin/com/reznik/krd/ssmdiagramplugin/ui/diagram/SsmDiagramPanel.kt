@@ -125,6 +125,15 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         repaint()
     }
 
+    /** Экспортирует актуальный граф с его геометрией, не изменяя состояние панели. */
+    fun exportSvg(destination: java.nio.file.Path) {
+        val currentGraph = graph ?: error("Diagram is not generated")
+        val currentLayout = layout ?: error("Diagram layout is not available")
+        com.reznik.krd.ssmdiagramplugin.export.SvgDiagramExporter().export(
+            destination, currentGraph, currentLayout, displayOptions
+        )
+    }
+
     // -------------------------------------------------------------------------
     // Painting
     // -------------------------------------------------------------------------
