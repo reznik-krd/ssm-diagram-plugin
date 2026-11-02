@@ -23,6 +23,8 @@ import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
 import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.DiagramDisplayOptions
+import javax.swing.JCheckBox
 
 /**
  * Управляет выбором конфигурации, генерацией диаграммы и элементами Tool Window.
@@ -46,6 +48,8 @@ class SsmDiagramToolWindowPanel(
     private val zoomInButton = JButton("+")
     private val fitButton = JButton("Fit")
     private val centerButton = JButton("Center")
+    private val hideGuardsCheckBox = JCheckBox("Hide Guards")
+    private val hideActionsCheckBox = JCheckBox("Hide Actions")
 
     private val progressIcon = AsyncProcessIcon("SSM Diagram progress")
     private val statusLabel = JBLabel()
@@ -126,6 +130,8 @@ class SsmDiagramToolWindowPanel(
         diagramPanel.setZoomChangedListener { zoom ->
             zoomButton.text = "${(zoom * 100).roundToInt()}%"
         }
+        hideGuardsCheckBox.addActionListener { updateDisplayOptions() }
+        hideActionsCheckBox.addActionListener { updateDisplayOptions() }
     }
 
     /**
@@ -173,6 +179,8 @@ class SsmDiagramToolWindowPanel(
             add(zoomInButton)
             add(fitButton)
             add(centerButton)
+            add(hideGuardsCheckBox)
+            add(hideActionsCheckBox)
         }
 
     /**
@@ -511,6 +519,18 @@ class SsmDiagramToolWindowPanel(
                     }
             },
             DIALOG_TITLE
+        )
+    }
+
+    /**
+     * Передаёт настройки отображения в панель диаграммы.
+     */
+    private fun updateDisplayOptions() {
+        diagramPanel.setDisplayOptions(
+            DiagramDisplayOptions(
+                hideGuards = hideGuardsCheckBox.isSelected,
+                hideActions = hideActionsCheckBox.isSelected
+            )
         )
     }
 

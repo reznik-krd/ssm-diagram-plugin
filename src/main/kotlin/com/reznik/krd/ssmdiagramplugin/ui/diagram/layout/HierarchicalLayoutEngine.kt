@@ -1,5 +1,6 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.DiagramDisplayOptions
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 import java.awt.Dimension
@@ -16,7 +17,7 @@ class HierarchicalLayoutEngine {
     /**
      * Рассчитывает положение узлов, маршруты рёбер и размер диаграммы.
      */
-    fun layout(graph: DiagramGraph): DiagramLayout {
+    fun layout(graph: DiagramGraph, options: DiagramDisplayOptions): DiagramLayout {
         if (graph.nodes.isEmpty()) {
             return DiagramLayout(
                 nodes = emptyMap(),
@@ -61,7 +62,7 @@ class HierarchicalLayoutEngine {
          * 5. Только после окончательного положения
          * nodes строим edges.
          */
-        val edges = edgeRouter.route(graph = graph, nodes = nodes)
+        val edges = edgeRouter.route(graph = graph, nodes = nodes, options)
 
         /*
          * 6. Размер canvas считаем по фактическим nodes.
@@ -181,42 +182,33 @@ class HierarchicalLayoutEngine {
     /**
      * Назначает итоговые координаты узлам.
      */
+    /** Возвращает индивидуальный размер состояния или ромба Choice. */
+    private fun nodeSize(node: DiagramNode): Dimension =
+        if (node.type == DiagramNode.Type.CHOICE) ChoiceNodeLayoutCalculator.calculate(node.label)
+        else Dimension(LayoutDimensions.NODE_WIDTH, LayoutDimensions.NODE_HEIGHT)
+
     private fun assignCoordinates(
         layers: Map<Int, List<DiagramNode>>
     ): MutableMap<String, NodeLayout> {
 
         val result = mutableMapOf<String, NodeLayout>()
-        val maxNodesInLayer = layers.values.maxOfOrNull { it.size } ?: 1
-
-        val maxLayerWidth = calculateLayerWidth(maxNodesInLayer)
-
-        layers.forEach { (level, layerNodes) ->
-            val layerWidth = calculateLayerWidth(layerNodes.size)
-
-            /*
-             * Каждый ряд центрируем относительно
-             * самого широкого ряда.
-             */
-            var x = LayoutDimensions.CANVAS_MARGIN + (maxLayerWidth - layerWidth) / 2
-            val y = LayoutDimensions.CANVAS_MARGIN + level * (LayoutDimensions.NODE_HEIGHT + LayoutDimensions.VERTICAL_GAP)
-
-            layerNodes.forEach { node ->
-                result[node.id] = NodeLayout(x = x, y = y, width = LayoutDimensions.NODE_WIDTH, height = LayoutDimensions.NODE_HEIGHT)
-                x += LayoutDimensions.NODE_WIDTH + LayoutDimensions.HORIZONTAL_GAP
+        val sizes = layers.values.flatten().associate { it.id to nodeSize(it) }
+        fun layerWidth(nodes: List<DiagramNode>): Int =
+            nodes.sumOf { sizes.getValue(it.id).width } +
+                (nodes.size - 1).coerceAtLeast(0) * LayoutDimensions.HORIZONTAL_GAP
+        val maxLayerWidth = layers.values.maxOfOrNull(::layerWidth) ?: 0
+        var y = LayoutDimensions.CANVAS_MARGIN
+        layers.toSortedMap().forEach { (_, row) ->
+            val rowHeight = row.maxOfOrNull { sizes.getValue(it.id).height } ?: 0
+            var x = LayoutDimensions.CANVAS_MARGIN + (maxLayerWidth - layerWidth(row)) / 2
+            row.forEach { node ->
+                val size = sizes.getValue(node.id)
+                result[node.id] = NodeLayout(x, y + (rowHeight - size.height) / 2, size.width, size.height)
+                x += size.width + LayoutDimensions.HORIZONTAL_GAP
             }
+            y += rowHeight + LayoutDimensions.VERTICAL_GAP
         }
-
         return result
-    }
-
-    /**
-     * Вычисляет ширину одного уровня графа.
-     */
-    private fun calculateLayerWidth(nodeCount: Int): Int {
-        if (nodeCount <= 0) {
-            return 0
-        }
-        return nodeCount * LayoutDimensions.NODE_WIDTH + (nodeCount - 1) * LayoutDimensions.HORIZONTAL_GAP
     }
 
     /**

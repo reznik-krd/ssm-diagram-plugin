@@ -1,6 +1,7 @@
 
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.render
 
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.DiagramDisplayOptions
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramFocusResolver
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramHitRegistry
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramInteractionState
@@ -27,7 +28,8 @@ class DiagramRenderer(
     fun render(
         g2: Graphics2D,
         graph: DiagramGraph,
-        layout: DiagramLayout
+        layout: DiagramLayout,
+        options: DiagramDisplayOptions
     ) {
         val focus = focusResolver.resolve(
             graph = graph,
@@ -36,7 +38,7 @@ class DiagramRenderer(
 
         hitRegistry.clear()
 
-        edgeRenderer.render(g2, graph, layout, focus)
+        edgeRenderer.render(g2, graph, layout, focus, options)
         nodeRenderer.render(g2, graph, layout, focus)
     }
 }

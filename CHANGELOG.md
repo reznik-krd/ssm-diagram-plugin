@@ -2,6 +2,12 @@
 
 All notable changes to SSM Diagram are documented in this file.
 
+## [1.0.14] - 2026-11-2
+
+### Added
+- Скрыть guards, actions
+- тех. статус внутри ромбика
+
 ## [1.0.13] - 2026-11-2
 
 ### Added

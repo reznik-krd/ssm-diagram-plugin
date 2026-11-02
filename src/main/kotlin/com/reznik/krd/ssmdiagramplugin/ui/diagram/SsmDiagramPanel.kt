@@ -51,7 +51,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
     private var layout: DiagramLayout? = null
     private val zoomController = DiagramZoomController(this) { layout }
     private val zoom: Double get() = zoomController.zoom
-
+    private var displayOptions = DiagramDisplayOptions()
     private val panController = DiagramPanController(this) { layout != null }
     private val keyboardHandler = DiagramKeyboardHandler(this, panController) { layout != null }
     private val spacePressed: Boolean get() = panController.spacePressed
@@ -98,7 +98,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         val logicalGraph = graphBuilder.build(model)
         val visualGraph = graphTransformer.transform(logicalGraph)
         graph = visualGraph
-        layout = layoutEngine.layout(visualGraph)
+        layout = layoutEngine.layout(graph = visualGraph, options = displayOptions)
 
         interaction.clear()
         hitRegistry.clear()
@@ -153,7 +153,7 @@ class SsmDiagramPanel(project: Project) : JPanel() {
 
             g2.scale(zoom, zoom)
 
-            renderer.render(g2, currentGraph, currentLayout)
+            renderer.render(g2 = g2, graph = currentGraph, layout = currentLayout, options = displayOptions)
         } finally {
             g2.dispose()
         }
@@ -520,6 +520,26 @@ class SsmDiagramPanel(project: Project) : JPanel() {
         keyboardHandler.detach()
         super.removeNotify()
     }
+
+    /**
+     * Изменяет видимость подписей без повторного PSI-анализа.
+     */
+    fun setDisplayOptions(options: DiagramDisplayOptions) {
+        if (displayOptions == options) {
+            return
+        }
+
+        displayOptions = options
+        val currentGraph = graph ?: return
+
+        layout = layoutEngine.layout(graph = currentGraph, options = displayOptions)
+        hitRegistry.clear()
+        zoomController.updatePreferredSize()
+
+        revalidate()
+        repaint()
+    }
+
 
     // -------------------------------------------------------------------------
     // Constants

@@ -2,6 +2,7 @@ package com.reznik.krd.ssmdiagramplugin.ui.diagram.render
 
 import com.intellij.ui.JBColor
 import com.reznik.krd.ssmdiagramplugin.model.SsmAction
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.DiagramDisplayOptions
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.ActionHitArea
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.ActionKey
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramHitRegistry
@@ -38,9 +39,10 @@ internal class EdgeRenderer(
         g2: Graphics2D,
         graph: DiagramGraph,
         layout: DiagramLayout,
-        focus: DiagramFocus?
+        focus: DiagramFocus?,
+        options: DiagramDisplayOptions
     ) {
-        drawEdges(g2, graph, layout, focus)
+        drawEdges(g2, graph, layout, focus, options)
     }
 
     // -------------------------------------------------------------------------
@@ -56,7 +58,8 @@ internal class EdgeRenderer(
         g2: Graphics2D,
         graph: DiagramGraph,
         layout: DiagramLayout,
-        focus: DiagramFocus?
+        focus: DiagramFocus?,
+        options: DiagramDisplayOptions
     ) {
         val selectedEdges = graph.edges.filter {
             isSelected(it, graph)
@@ -72,8 +75,8 @@ internal class EdgeRenderer(
                     edge = edge,
                     layout = layout,
                     selected = false,
-                    muted = focus != null &&
-                            !focus.isFocusedEdge(edge.id)
+                    muted = focus != null && !focus.isFocusedEdge(edge.id),
+                    options = options,
                 )
             }
 
@@ -83,7 +86,8 @@ internal class EdgeRenderer(
                 edge = edge,
                 layout = layout,
                 selected = true,
-                muted = false
+                muted = false,
+                options = options,
             )
         }
     }
@@ -95,7 +99,8 @@ internal class EdgeRenderer(
         g2: Graphics2D,
         edge: DiagramEdge,
         layout: DiagramLayout,
-        selected: Boolean
+        selected: Boolean,
+        options: DiagramDisplayOptions
     ) {
         val edgeLayout = layout.edges[edge.id] ?: return
         if (edgeLayout.points.size < 2) {
@@ -155,7 +160,7 @@ internal class EdgeRenderer(
          * Labels belonging to selected edge
          * are highlighted as well.
          */
-        drawEdgeLabels(g2 = g2, edge = edge, edgeLayout = edgeLayout, selected = selected)
+        drawEdgeLabels(g2 = g2, edge = edge, edgeLayout = edgeLayout, selected = selected, options)
         g2.stroke = oldStroke
         g2.color = oldColor
     }
@@ -172,7 +177,8 @@ internal class EdgeRenderer(
         edge: DiagramEdge,
         layout: DiagramLayout,
         selected: Boolean,
-        muted: Boolean
+        muted: Boolean,
+        options: DiagramDisplayOptions
     ) {
         val graphics = g2.create() as Graphics2D
 
@@ -188,7 +194,8 @@ internal class EdgeRenderer(
                 g2 = graphics,
                 edge = edge,
                 layout = layout,
-                selected = selected
+                selected = selected,
+                options = options,
             )
         } finally {
             graphics.dispose()
@@ -207,7 +214,8 @@ internal class EdgeRenderer(
         g2: Graphics2D,
         edge: DiagramEdge,
         edgeLayout: EdgeLayout,
-        selected: Boolean
+        selected: Boolean,
+        options: DiagramDisplayOptions
     ) {
 
         /*
@@ -252,35 +260,38 @@ internal class EdgeRenderer(
                 else -> null
             }
 
-        guardText?.let { text ->
-                edgeLayout.guardLabelPosition
-                    ?.let { position ->
-                        drawLabelChip(
-                            g2 = g2,
-                            text = text,
-                            position = position,
-                            kind = LabelKind.GUARD,
-                            edgeId = edge.id,
-                            selected = selected
-                        )
-                    }
+        if (!options.hideGuards) {
+            guardText?.let { text ->
+                edgeLayout.guardLabelPosition?.let { position ->
+                    drawLabelChip(
+                        g2 = g2,
+                        text = text,
+                        position = position,
+                        kind = LabelKind.GUARD,
+                        edgeId = edge.id,
+                        selected = selected
+                    )
+                }
             }
+        }
 
         /*
          * Actions.
          */
-        edge.actions
-            .zip(edgeLayout.actionLabelPositions)
-            .forEachIndexed { index, (ssmAction, position) ->
-                drawActionLabel(
-                    g2 = g2,
-                    edge = edge,
-                    actionIndex = index,
-                    action = ssmAction,
-                    position = position,
-                    selected = selected
-                )
-            }
+        if (!options.hideActions) {
+            edge.actions
+                .zip(edgeLayout.actionLabelPositions)
+                .forEachIndexed { index, (ssmAction, position) ->
+                    drawActionLabel(
+                        g2 = g2,
+                        edge = edge,
+                        actionIndex = index,
+                        action = ssmAction,
+                        position = position,
+                        selected = selected
+                    )
+                }
+        }
     }
 
     // -------------------------------------------------------------------------

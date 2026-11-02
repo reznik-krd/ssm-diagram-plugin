@@ -1,9 +1,11 @@
 package com.reznik.krd.ssmdiagramplugin.ui.diagram.layout
 
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.DiagramDisplayOptions
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramEdge
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import java.awt.Point
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Строит ортогональные маршруты переходов и размещает их подписи.
@@ -58,7 +60,8 @@ class OrthogonalEdgeRouter {
      */
     fun route(
         graph: DiagramGraph,
-        nodes: Map<String, NodeLayout>
+        nodes: Map<String, NodeLayout>,
+        options: DiagramDisplayOptions
     ): Map<String, EdgeLayout> {
 
         val result = mutableMapOf<String, EdgeLayout>()
@@ -99,7 +102,8 @@ class OrthogonalEdgeRouter {
                         edge = edge,
                         source = source,
                         target = target,
-                        parallelOffset = parallelOffset
+                        parallelOffset = parallelOffset,
+                        options = options
                     )
 
                 /*
@@ -384,7 +388,8 @@ class OrthogonalEdgeRouter {
         edge: DiagramEdge,
         source: NodeLayout,
         target: NodeLayout,
-        parallelOffset: Int
+        parallelOffset: Int,
+        options: DiagramDisplayOptions
     ): EdgeLayout {
 
         /*
@@ -400,7 +405,8 @@ class OrthogonalEdgeRouter {
                 edge = edge,
                 source = source,
                 target = target,
-                parallelOffset = parallelOffset
+                parallelOffset = parallelOffset,
+                options = options
             )
         }
 
@@ -414,7 +420,8 @@ class OrthogonalEdgeRouter {
                 edge = edge,
                 source = source,
                 target = target,
-                parallelOffset = parallelOffset
+                parallelOffset = parallelOffset,
+                options = options
             )
         }
 
@@ -425,7 +432,8 @@ class OrthogonalEdgeRouter {
             edge = edge,
             source = source,
             target = target,
-            parallelOffset = parallelOffset
+            parallelOffset = parallelOffset,
+            options = options
         )
     }
 
@@ -436,7 +444,8 @@ class OrthogonalEdgeRouter {
         edge: DiagramEdge,
         source: NodeLayout,
         target: NodeLayout,
-        parallelOffset: Int
+        parallelOffset: Int,
+        options: DiagramDisplayOptions
     ): EdgeLayout {
         val start = Point(source.bottom.x + parallelOffset, source.bottom.y)
         val end = Point(target.top.x + parallelOffset, target.top.y)
@@ -456,19 +465,22 @@ class OrthogonalEdgeRouter {
                     createEventPosition(
                         edge = edge,
                         target = target,
-                        parallelOffset = parallelOffset
+                        parallelOffset = parallelOffset,
+                        options = options
                     ),
                 guardLabelPosition =
                     createGuardPosition(
                         edge = edge,
                         target = target,
-                        parallelOffset = parallelOffset
+                        parallelOffset = parallelOffset,
+                        options = options
                     ),
                 actionLabelPositions =
                     createActionPositions(
                         edge = edge,
                         target = target,
-                        parallelOffset = parallelOffset
+                        parallelOffset = parallelOffset,
+                    options = options
                     )
             )
         }
@@ -498,19 +510,22 @@ class OrthogonalEdgeRouter {
                 createEventPosition(
                     edge = edge,
                     target = target,
-                    parallelOffset = parallelOffset
+                    parallelOffset = parallelOffset,
+                    options = options
                 ),
             guardLabelPosition =
                 createGuardPosition(
                     edge = edge,
                     target = target,
-                    parallelOffset = parallelOffset
+                    parallelOffset = parallelOffset,
+                    options = options
                 ),
             actionLabelPositions =
                 createActionPositions(
                     edge = edge,
                     target = target,
-                    parallelOffset = parallelOffset
+                    parallelOffset = parallelOffset,
+                    options = options
                 )
         )
     }
@@ -522,7 +537,8 @@ class OrthogonalEdgeRouter {
         edge: DiagramEdge,
         source: NodeLayout,
         target: NodeLayout,
-        parallelOffset: Int
+        parallelOffset: Int,
+        options: DiagramDisplayOptions
     ): EdgeLayout {
 
         val leftToRight = target.x > source.x
@@ -572,13 +588,15 @@ class OrthogonalEdgeRouter {
                 createGuardPosition(
                     edge = edge,
                     target = target,
-                    parallelOffset = parallelOffset
+                    parallelOffset = parallelOffset,
+                    options = options
                 ),
             actionLabelPositions =
                 createActionPositions(
                     edge = edge,
                     target = target,
-                    parallelOffset = parallelOffset
+                    parallelOffset = parallelOffset,
+                    options = options
                 )
         )
     }
@@ -590,7 +608,8 @@ class OrthogonalEdgeRouter {
         edge: DiagramEdge,
         source: NodeLayout,
         target: NodeLayout,
-        parallelOffset: Int
+        parallelOffset: Int,
+        options: DiagramDisplayOptions
     ): EdgeLayout {
         val start = Point(source.right.x, source.right.y + parallelOffset)
         val end = Point(target.right.x, target.right.y + parallelOffset)
@@ -629,13 +648,15 @@ class OrthogonalEdgeRouter {
                 createGuardPosition(
                     edge = edge,
                     target = target,
-                    parallelOffset = parallelOffset
+                    parallelOffset = parallelOffset,
+                    options = options
                 ),
             actionLabelPositions =
                 createActionPositions(
                     edge = edge,
                     target = target,
-                    parallelOffset = parallelOffset
+                    parallelOffset = parallelOffset,
+                    options = options
                 )
         )
     }
@@ -650,10 +671,11 @@ class OrthogonalEdgeRouter {
     private fun createActionPositions(
         edge: DiagramEdge,
         target: NodeLayout,
-        parallelOffset: Int
+        parallelOffset: Int,
+        options: DiagramDisplayOptions
     ): List<Point> {
 
-        if (edge.actions.isEmpty()) {
+        if (options.hideActions || edge.actions.isEmpty()) {
             return emptyList()
         }
 
@@ -682,7 +704,8 @@ class OrthogonalEdgeRouter {
     private fun createGuardPosition(
         edge: DiagramEdge,
         target: NodeLayout,
-        parallelOffset: Int
+        parallelOffset: Int,
+        options: DiagramDisplayOptions
     ): Point? {
 
         /*
@@ -694,11 +717,11 @@ class OrthogonalEdgeRouter {
          */
         val hasGuard = edge.guard != null || edge.type == DiagramEdge.Type.CHOICE_BRANCH
 
-        if (!hasGuard) {
+        if (options.hideGuards || !hasGuard) {
             return null
         }
 
-        val actionsHeight = edge.actions.size * ACTION_LABEL_GAP
+        val actionsHeight = (if (options.hideActions) 0 else edge.actions.size) * ACTION_LABEL_GAP
 
         return Point(
             target.center.x + parallelOffset,
@@ -715,19 +738,20 @@ class OrthogonalEdgeRouter {
     private fun createEventPosition(
         edge: DiagramEdge,
         target: NodeLayout,
-        parallelOffset: Int
+        parallelOffset: Int,
+        options: DiagramDisplayOptions
     ): Point? {
 
         if (edge.event == null) {
             return null
         }
 
-        val actionsHeight = edge.actions.size * ACTION_LABEL_GAP
+        val actionsHeight = (if (options.hideActions) 0 else edge.actions.size) * ACTION_LABEL_GAP
 
         val guardHeight =
             if (
-                edge.guard != null ||
-                edge.type == DiagramEdge.Type.CHOICE_BRANCH
+                !options.hideGuards && (edge.guard != null ||
+                edge.type == DiagramEdge.Type.CHOICE_BRANCH)
             ) {
                 GUARD_ACTION_GAP
             } else {

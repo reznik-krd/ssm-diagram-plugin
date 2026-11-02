@@ -33,14 +33,18 @@ internal class DiagramHitTester(
             .firstOrNull { node ->
                 val nodeLayout = currentLayout.nodes[node.id] ?: return@firstOrNull false
 
-                diagramX >= nodeLayout.x &&
-                        diagramX <=
-                        nodeLayout.x +
-                        nodeLayout.width &&
+                if (node.type == DiagramNode.Type.CHOICE) {
+                    val halfWidth = nodeLayout.width / 2.0
+                    val halfHeight = nodeLayout.height / 2.0
+                    val distanceX = kotlin.math.abs(diagramX - (nodeLayout.x + halfWidth)) / halfWidth
+                    val distanceY = kotlin.math.abs(diagramY - (nodeLayout.y + halfHeight)) / halfHeight
+                    distanceX + distanceY <= 1.0
+                } else {
+                    diagramX >= nodeLayout.x &&
+                        diagramX <= nodeLayout.x + nodeLayout.width &&
                         diagramY >= nodeLayout.y &&
-                        diagramY <=
-                        nodeLayout.y +
-                        nodeLayout.height
+                        diagramY <= nodeLayout.y + nodeLayout.height
+                }
             }
     }
 

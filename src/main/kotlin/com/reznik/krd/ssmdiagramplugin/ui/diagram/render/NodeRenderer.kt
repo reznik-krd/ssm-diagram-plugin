@@ -11,6 +11,7 @@ import java.awt.Graphics2D
 import java.awt.Point
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramFocus
 import java.awt.AlphaComposite
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.layout.ChoiceNodeLayoutCalculator
 
 /**
  * Отрисовывает состояния, choice и технические initial/end маркеры.
@@ -212,31 +213,10 @@ internal class NodeRenderer(
     ) {
         val centerX = position.x + width / 2
         val centerY = position.y + height / 2
-        val halfSize = 26
-
-        val xPoints =
-            intArrayOf(
-                centerX,
-                centerX + halfSize,
-                centerX,
-                centerX - halfSize
-            )
-
-        val yPoints =
-            intArrayOf(
-                centerY - halfSize,
-                centerY,
-                centerY + halfSize,
-                centerY
-            )
-
+        val xPoints = intArrayOf(centerX, position.x + width, centerX, position.x)
+        val yPoints = intArrayOf(position.y, centerY, position.y + height, centerY)
         val hovered = node.id == interaction.hoveredNodeId
-        g2.color = if (selected) {
-            DiagramColors.SELECTED_STATE_BACKGROUND
-        } else {
-            DiagramColors.CHOICE_BACKGROUND
-        }
-
+        g2.color = if (selected) DiagramColors.SELECTED_STATE_BACKGROUND else DiagramColors.CHOICE_BACKGROUND
         g2.fillPolygon(xPoints, yPoints, 4)
         g2.color = when {
             selected -> DiagramColors.SELECTED_BORDER
@@ -244,20 +224,28 @@ internal class NodeRenderer(
             hovered -> DiagramColors.CHOICE_HOVER_BORDER
             else -> DiagramColors.CHOICE_BORDER
         }
-
-        g2.stroke = BasicStroke(
-            when {
-                selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
-                incomingSource -> DiagramColors.INCOMING_NODE_BORDER_WIDTH
-                hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
-                else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
-            }
-        )
-
+        g2.stroke = BasicStroke(when {
+            selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
+            incomingSource -> DiagramColors.INCOMING_NODE_BORDER_WIDTH
+            hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
+            else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
+        })
         g2.drawPolygon(xPoints, yPoints, 4)
-        g2.color = DiagramColors.CHOICE_TEXT
-        g2.drawString(node.label, centerX + halfSize + 12, centerY + 5
-        )
+        val previousFont = g2.font
+        try {
+            g2.font = ChoiceNodeLayoutCalculator.font
+            val lines = ChoiceNodeLayoutCalculator.lines(node.label)
+            val metrics = g2.fontMetrics
+            val lineHeight = ChoiceNodeLayoutCalculator.LINE_HEIGHT
+            val top = centerY - lines.size * lineHeight / 2
+            g2.color = if (selected) DiagramColors.SELECTED_STATE_TEXT else DiagramColors.CHOICE_TEXT
+            lines.forEachIndexed { index, text ->
+                val baseline = top + index * lineHeight + (lineHeight - metrics.height) / 2 + metrics.ascent
+                g2.drawString(text, centerX - metrics.stringWidth(text) / 2, baseline)
+            }
+        } finally {
+            g2.font = previousFont
+        }
     }
 
     // -------------------------------------------------------------------------
