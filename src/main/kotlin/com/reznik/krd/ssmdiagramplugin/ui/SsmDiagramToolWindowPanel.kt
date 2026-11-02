@@ -25,6 +25,12 @@ import com.intellij.openapi.application.ReadAction
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.DiagramDisplayOptions
 import javax.swing.JCheckBox
+import com.reznik.krd.ssmdiagramplugin.export.PlantUmlExporter
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import javax.swing.JFileChooser
+import javax.swing.filechooser.FileNameExtensionFilter
 
 /**
  * Управляет выбором конфигурации, генерацией диаграммы и элементами Tool Window.
@@ -48,6 +54,8 @@ class SsmDiagramToolWindowPanel(
     private val zoomInButton = JButton("+")
     private val fitButton = JButton("Fit")
     private val centerButton = JButton("Center")
+    private val exportPlantUmlButton = JButton("Export PlantUML")
+    private val plantUmlExporter = PlantUmlExporter()
     private val hideGuardsCheckBox = JCheckBox("Hide Guards")
     private val hideActionsCheckBox = JCheckBox("Hide Actions")
 
@@ -132,6 +140,7 @@ class SsmDiagramToolWindowPanel(
         }
         hideGuardsCheckBox.addActionListener { updateDisplayOptions() }
         hideActionsCheckBox.addActionListener { updateDisplayOptions() }
+        exportPlantUmlButton.addActionListener { exportPlantUml() }
     }
 
     /**
@@ -167,6 +176,7 @@ class SsmDiagramToolWindowPanel(
             add(openConfigButton)
             add(refreshButton)
             add(clearButton)
+            add(exportPlantUmlButton)
         }
 
     /**
@@ -435,6 +445,7 @@ class SsmDiagramToolWindowPanel(
         generateButton.isEnabled = !busy && hasSelectedConfig
         openConfigButton.isEnabled = !busy && hasSelectedConfig
         refreshButton.isEnabled = !busy && hasDiagram
+        exportPlantUmlButton.isEnabled = !busy && hasDiagram
 
         clearButton.isEnabled = hasDiagram
         zoomOutButton.isEnabled = hasDiagram
@@ -533,6 +544,91 @@ class SsmDiagramToolWindowPanel(
             )
         )
     }
+
+
+    /**
+     * Экспортирует текущую диаграмму в файл PlantUML.
+     *
+     * Сохраняет логическую StateMachine без Guards,
+     * Actions и визуальных копий состояний.
+     */
+    private fun exportPlantUml() {
+        // После Clear экспорт недоступен.
+        val configPath = displayedConfigPath ?: return
+
+        val model = diagramService.currentModel() ?: return
+
+        val configName = File(configPath)
+            .nameWithoutExtension
+            .ifBlank { "StateMachine" }
+
+        val chooser = JFileChooser().apply {
+            dialogTitle = "Export StateMachine to PlantUML"
+            dialogType = JFileChooser.SAVE_DIALOG
+
+            fileFilter = FileNameExtensionFilter(
+                "PlantUML (*.puml)",
+                "puml"
+            )
+
+            selectedFile = File("$configName.puml")
+
+            project.basePath
+                ?.let(::File)
+                ?.takeIf { it.isDirectory }
+                ?.let { currentDirectory = it }
+        }
+
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return
+        }
+
+        val selectedFile = chooser.selectedFile ?: return
+
+        val destination = if (
+            selectedFile.extension.equals("puml", ignoreCase = true)
+        ) {
+            selectedFile
+        } else {
+            File(selectedFile.parentFile, "${selectedFile.name}.puml")
+        }
+
+        // Не перезаписываем существующий файл без согласия.
+        if (destination.exists()) {
+            val answer = Messages.showYesNoDialog(
+                project,
+                "File ${destination.name} already exists. Overwrite it?",
+                "Export PlantUML",
+                Messages.getQuestionIcon()
+            )
+
+            if (answer != Messages.YES) {
+                return
+            }
+        }
+
+        try {
+            val content = plantUmlExporter.export(model)
+
+            Files.writeString(
+                destination.toPath(),
+                content,
+                StandardCharsets.UTF_8
+            )
+
+            Messages.showInfoMessage(
+                project,
+                "PlantUML file saved:\n${destination.absolutePath}",
+                "Export PlantUML"
+            )
+        } catch (exception: Exception) {
+            showError(
+                "Failed to export PlantUML.",
+                exception
+            )
+        }
+    }
+
 
     private companion object {
         const val CONFIG_COMBO_WIDTH = 230

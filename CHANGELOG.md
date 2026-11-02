@@ -2,6 +2,11 @@
 
 All notable changes to SSM Diagram are documented in this file.
 
+## [1.0.15] - 2026-11-2
+
+### Added
+- Выгрузка в plantUML
+
 ## [1.0.14] - 2026-11-2
 
 ### Added
