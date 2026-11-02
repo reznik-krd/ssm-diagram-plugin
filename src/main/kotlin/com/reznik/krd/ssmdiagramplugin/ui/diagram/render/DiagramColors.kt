@@ -70,4 +70,37 @@ internal object DiagramColors {
         Color(0x8291A6),
         Color(0x879AB3)
     )
+
+    // Selected state — Blue
+    val SELECTED_STATE_BACKGROUND = JBColor(
+        Color(0xDBEDFF),
+        Color(0x24445A)
+    )
+
+    val SELECTED_STATE_TEXT = JBColor(
+        Color(0x14558A),
+        Color(0xC7E3FF)
+    )
+
+    // Incoming source — Green
+    val INCOMING_STATE_BACKGROUND = JBColor(
+        Color(0xDCF5E8),
+        Color(0x2B4438)
+    )
+
+    val INCOMING_STATE_BORDER = JBColor(
+        Color(0x39A66D),
+        Color(0x52C78C)
+    )
+
+    val INCOMING_STATE_TEXT = JBColor(
+        Color(0x216943),
+        Color(0xAEF3C9)
+    )
+
+    // Focus mode
+    const val UNFOCUSED_OPACITY = 0.35f
+    const val FULL_OPACITY = 1.0f
+    const val INCOMING_NODE_BORDER_WIDTH = 2.2f
+
 }

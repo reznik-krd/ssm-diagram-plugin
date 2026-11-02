@@ -6,10 +6,11 @@ import com.reznik.krd.ssmdiagramplugin.ui.diagram.layout.DiagramLayout
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramGraph
 import com.reznik.krd.ssmdiagramplugin.ui.diagram.model.DiagramNode
 import java.awt.BasicStroke
-import java.awt.Color
 import java.awt.Font
 import java.awt.Graphics2D
 import java.awt.Point
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramFocus
+import java.awt.AlphaComposite
 
 /**
  * Отрисовывает состояния, choice и технические initial/end маркеры.
@@ -18,89 +19,97 @@ internal class NodeRenderer(
     private val interaction: DiagramInteractionState
 ) {
 
+
     /**
-     * Отрисовывает соответствующую часть диаграммы.
+     * Отрисовывает состояния с учётом выбранного узла,
+     * непосредственных предшественников и приглушения остальных.
      */
     fun render(
         g2: Graphics2D,
         graph: DiagramGraph,
-        layout: DiagramLayout
+        layout: DiagramLayout,
+        focus: DiagramFocus?
     ) {
-
-        /*
-         * Concrete edge selected by clicking a transition.
-         */
         val selectedEdge = interaction.selectedEdgeId
-                ?.let { selectedEdgeId -> graph.edges
-                        .firstOrNull { it.id == selectedEdgeId }
-                }
-
-        /*
-         * Logical state selected by clicking a state.
-         *
-         * logicalId is used because ReadableGraphTransformer
-         * may create several visual copies of one logical state.
-         */
-        val selectedNodeLogicalId = interaction.selectedNodeLogicalId
+            ?.let { selectedId ->
+                graph.edges.firstOrNull { it.id == selectedId }
+            }
 
         graph.nodes.forEach { node ->
-
             val nodeLayout = layout.nodes[node.id] ?: return@forEach
-
             val position = Point(nodeLayout.x, nodeLayout.y)
 
-            /*
-             * State was explicitly selected.
-             */
-            val selectedByNode = selectedNodeLogicalId != null &&
-                        node.logicalId == selectedNodeLogicalId
+            val selectedByNode =
+                focus?.selectedLogicalId == node.logicalId
 
-            /*
-             * Node is source/target of explicitly selected edge.
-             */
-            val selectedByEdge = selectedEdge != null
-                    && (node.id == selectedEdge.source || node.id == selectedEdge.target)
+            val selectedByEdge = selectedEdge != null &&
+                    (node.id == selectedEdge.source ||
+                            node.id == selectedEdge.target)
 
             val selected = selectedByNode || selectedByEdge
 
-            when (node.type) {
-                DiagramNode.Type.INITIAL_MARKER ->
-                    drawInitialMarker(
-                        g2 = g2,
-                        position = position,
-                        width = nodeLayout.width,
-                        height = nodeLayout.height,
-                        selected = selected
-                    )
+            val incomingSource = focus != null &&
+                    !selectedByNode &&
+                    focus.isIncomingSource(node.logicalId)
 
-                DiagramNode.Type.END_MARKER ->
-                    drawEndMarker(
-                        g2 = g2,
-                        position = position,
-                        width = nodeLayout.width,
-                        height = nodeLayout.height,
-                        selected = selected
-                    )
+            val muted = focus != null &&
+                    !focus.isFocusedNode(node.logicalId)
 
-                DiagramNode.Type.CHOICE ->
-                    drawChoiceNode(
-                        g2 = g2,
-                        node = node,
-                        position = position,
-                        width = nodeLayout.width,
-                        height = nodeLayout.height,
-                        selected = selected
-                    )
+            // Отдельный Graphics2D, чтобы прозрачность не
+            // влияла на соседние элементы и другие рендереры.
+            val graphics = g2.create() as Graphics2D
 
-                DiagramNode.Type.STATE ->
-                    drawStateNode(
-                        g2 = g2,
-                        node = node,
-                        position = position,
-                        width = nodeLayout.width,
-                        height = nodeLayout.height,
-                        selected = selected
+            try {
+                if (muted) {
+                    graphics.composite = AlphaComposite.getInstance(
+                        AlphaComposite.SRC_OVER,
+                        DiagramColors.UNFOCUSED_OPACITY
                     )
+                }
+
+                when (node.type) {
+                    DiagramNode.Type.INITIAL_MARKER ->
+                        drawInitialMarker(
+                            graphics,
+                            position,
+                            nodeLayout.width,
+                            nodeLayout.height,
+                            selected
+                        )
+
+                    DiagramNode.Type.END_MARKER ->
+                        drawEndMarker(
+                            graphics,
+                            position,
+                            nodeLayout.width,
+                            nodeLayout.height,
+                            selected
+                        )
+
+                    DiagramNode.Type.CHOICE ->
+                        drawChoiceNode(
+                            graphics,
+                            node,
+                            position,
+                            nodeLayout.width,
+                            nodeLayout.height,
+                            selected,
+                            incomingSource
+                        )
+
+                    DiagramNode.Type.STATE ->
+                        drawStateNode(
+                            graphics,
+                            node,
+                            position,
+                            nodeLayout.width,
+                            nodeLayout.height,
+                            selected,
+                            incomingSource
+                        )
+                }
+            } finally {
+                graphics.dispose()
             }
         }
     }
@@ -109,8 +118,10 @@ internal class NodeRenderer(
     // State
     // -------------------------------------------------------------------------
 
+
     /**
-     * Отрисовывает обычное состояние.
+     * Рисует обычное состояние с учётом его роли
+     * в текущей подсветке.
      */
     private fun drawStateNode(
         g2: Graphics2D,
@@ -118,38 +129,70 @@ internal class NodeRenderer(
         position: Point,
         width: Int,
         height: Int,
-        selected: Boolean
+        selected: Boolean,
+        incomingSource: Boolean
     ) {
         val hovered = node.id == interaction.hoveredNodeId
-        g2.color = DiagramColors.STATE_BACKGROUND
 
-        g2.fillRoundRect(position.x, position.y, width, height, 14, 14)
+        g2.color = when {
+            selected -> DiagramColors.SELECTED_STATE_BACKGROUND
+            incomingSource -> DiagramColors.INCOMING_STATE_BACKGROUND
+            else -> DiagramColors.STATE_BACKGROUND
+        }
+
+        g2.fillRoundRect(
+            position.x,
+            position.y,
+            width,
+            height,
+            14,
+            14
+        )
 
         g2.color = when {
             selected -> DiagramColors.SELECTED_BORDER
+            incomingSource -> DiagramColors.INCOMING_STATE_BORDER
             hovered -> DiagramColors.STATE_HOVER_BORDER
             else -> DiagramColors.STATE_BORDER
         }
 
-        g2.stroke =
-            BasicStroke(
-                when {
-                    selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
-                    hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
-                    else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
-                }
-            )
+        g2.stroke = BasicStroke(
+            when {
+                selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
+                incomingSource -> DiagramColors.INCOMING_NODE_BORDER_WIDTH
+                hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
+                else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
+            }
+        )
 
-        g2.drawRoundRect(position.x, position.y, width, height, 14, 14)
+        g2.drawRoundRect(
+            position.x,
+            position.y,
+            width,
+            height,
+            14,
+            14
+        )
+
         val oldFont = g2.font
         g2.font = oldFont.deriveFont(Font.PLAIN, 13f)
+
         val metrics = g2.fontMetrics
-        val textX = position.x + (width - metrics.stringWidth(node.label)) / 2
-        val textY = position.y + (height - metrics.height) / 2 + metrics.ascent
-        g2.color = DiagramColors.STATE_TEXT
+        val textX = position.x +
+                (width - metrics.stringWidth(node.label)) / 2
+        val textY = position.y +
+                (height - metrics.height) / 2 + metrics.ascent
+
+        g2.color = when {
+            selected -> DiagramColors.SELECTED_STATE_TEXT
+            incomingSource -> DiagramColors.INCOMING_STATE_TEXT
+            else -> DiagramColors.STATE_TEXT
+        }
+
         g2.drawString(node.label, textX, textY)
         g2.font = oldFont
     }
+
 
     // -------------------------------------------------------------------------
     // Choice
@@ -164,7 +207,8 @@ internal class NodeRenderer(
         position: Point,
         width: Int,
         height: Int,
-        selected: Boolean
+        selected: Boolean,
+        incomingSource: Boolean
     ) {
         val centerX = position.x + width / 2
         val centerY = position.y + height / 2
@@ -187,22 +231,28 @@ internal class NodeRenderer(
             )
 
         val hovered = node.id == interaction.hoveredNodeId
-        g2.color = DiagramColors.CHOICE_BACKGROUND
+        g2.color = if (selected) {
+            DiagramColors.SELECTED_STATE_BACKGROUND
+        } else {
+            DiagramColors.CHOICE_BACKGROUND
+        }
 
         g2.fillPolygon(xPoints, yPoints, 4)
         g2.color = when {
             selected -> DiagramColors.SELECTED_BORDER
+            incomingSource -> DiagramColors.INCOMING_STATE_BORDER
             hovered -> DiagramColors.CHOICE_HOVER_BORDER
             else -> DiagramColors.CHOICE_BORDER
         }
 
         g2.stroke = BasicStroke(
-                when {
-                    selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
-                    hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
-                    else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
-                }
-            )
+            when {
+                selected -> NodeRenderDimensions.SELECTED_NODE_WIDTH
+                incomingSource -> DiagramColors.INCOMING_NODE_BORDER_WIDTH
+                hovered -> NodeRenderDimensions.HOVER_NODE_WIDTH
+                else -> NodeRenderDimensions.NORMAL_NODE_WIDTH
+            }
+        )
 
         g2.drawPolygon(xPoints, yPoints, 4)
         g2.color = DiagramColors.CHOICE_TEXT

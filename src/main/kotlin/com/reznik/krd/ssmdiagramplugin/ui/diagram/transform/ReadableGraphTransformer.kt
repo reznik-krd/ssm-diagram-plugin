@@ -55,6 +55,18 @@ class ReadableGraphTransformer {
                 return@filter false
             }
 
+            // Копии безопасны только для визуальных тупиков: у промежуточного
+            // состояния копия без исходящих рёбер разрывает читаемый flow.
+            if (graph.outgoing(node.id).isNotEmpty()) {
+                return@filter false
+            }
+
+            // Другие типы рёбер не копируются этим трансформером.
+            // Нельзя удалить оригинал, оставив ветку Choice без цели.
+            if (graph.incoming(node.id).any { it.type != DiagramEdge.Type.TRANSITION }) {
+                return@filter false
+            }
+
             val incoming = graph.incoming(node.id)
                     .filter {
                         it.type == DiagramEdge.Type.TRANSITION

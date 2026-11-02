@@ -80,41 +80,43 @@ class HierarchicalLayoutEngine {
      */
     private fun calculateLevels(graph: DiagramGraph): Map<String, Int> {
         val levels = mutableMapOf<String, Int>()
-        val roots = findRoots(graph)
         val queue = ArrayDeque<DiagramNode>()
+        val rootNodes = findRoots(graph)
 
-        roots.forEach { root ->
-            levels[root.id] = 0
+        /**
+         * Раскладывает один достижимый компонент обходом в ширину.
+         * Уже размещённые вершины не меняют уровень при обратных рёбрах.
+         */
+        fun visitComponent(root: DiagramNode, startLevel: Int) {
+            if (root.id in levels) return
+            levels[root.id] = startLevel
             queue.add(root)
-        }
 
-        while (queue.isNotEmpty()) {
-            val current = queue.removeFirst()
-            val currentLevel = levels[current.id] ?: 0
-            graph.outgoing(current.id)
-                .forEach { edge ->
-                    val target =
-                        graph.node(edge.target)
-                            ?: return@forEach
-
-                    if (target.id in levels) {
-                        return@forEach
+            while (queue.isNotEmpty()) {
+                val current = queue.removeFirst()
+                val nextLevel = levels.getValue(current.id) + 1
+                graph.outgoing(current.id).forEach { edge ->
+                    val target = graph.node(edge.target) ?: return@forEach
+                    if (target.id !in levels) {
+                        levels[target.id] = nextLevel
+                        queue.add(target)
                     }
-
-                    levels[target.id] = currentLevel + 1
-
-                    queue.add(target)
                 }
+            }
         }
 
-        var fallbackLevel = (levels.values.maxOrNull() ?: -1) + 1
+        // Сначала основная ветка от INITIAL (или другого обнаруженного корня).
+        rootNodes.forEach { visitComponent(it, 0) }
 
-        graph.nodes
-            .filter { it.id !in levels }
-            .forEach { node ->
-                levels[node.id] =
-                    fallbackLevel
+        // Ранее все недостижимые вершины попадали на одну горизонталь.
+        // Теперь каждый оставшийся компонент получает собственный обход
+        // и распределяется по последовательным уровням.
+        graph.nodes.forEach { node ->
+            if (node.id !in levels) {
+                val nextLevel = (levels.values.maxOrNull() ?: -1) + 1
+                visitComponent(node, nextLevel)
             }
+        }
 
         return levels
     }

@@ -19,6 +19,8 @@ import java.awt.Rectangle
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import com.reznik.krd.ssmdiagramplugin.ui.diagram.interaction.DiagramFocus
+import java.awt.AlphaComposite
 
 /**
  * Отрисовывает переходы, стрелки, подписи и состояние выделения рёбер.
@@ -29,72 +31,61 @@ internal class EdgeRenderer(
 ) {
 
     /**
-     * Отрисовывает соответствующую часть диаграммы.
+     * Отрисовывает переходы с учётом подсветки
+     * и приглушения несвязанных элементов.
      */
-    fun render(g2: Graphics2D, graph: DiagramGraph, layout: DiagramLayout) {
-        drawEdges(g2, graph, layout)
+    fun render(
+        g2: Graphics2D,
+        graph: DiagramGraph,
+        layout: DiagramLayout,
+        focus: DiagramFocus?
+    ) {
+        drawEdges(g2, graph, layout, focus)
     }
 
     // -------------------------------------------------------------------------
     // Edges
     // -------------------------------------------------------------------------
 
+
     /**
-     * Отрисовывает набор рёбер с учётом порядка выделения.
+     * Сначала рисует обычные переходы, затем выделенные,
+     * чтобы активные стрелки находились поверх остальных.
      */
     private fun drawEdges(
         g2: Graphics2D,
         graph: DiagramGraph,
-        layout: DiagramLayout
+        layout: DiagramLayout,
+        focus: DiagramFocus?
     ) {
+        val selectedEdges = graph.edges.filter {
+            isSelected(it, graph)
+        }
 
-        /*
-         * Draw non-selected edges first.
-         *
-         * Selected transitions are rendered afterwards,
-         * therefore highlighted paths stay above
-         * normal transition lines.
-         */
+        val selectedIds = selectedEdges.map { it.id }.toSet()
+
         graph.edges
-            .filterNot {
-                isSelected(
-                    edge = it,
-                    graph = graph
-                )
-            }
+            .filterNot { it.id in selectedIds }
             .forEach { edge ->
-
-                drawEdge(
+                drawFocusedEdge(
                     g2 = g2,
                     edge = edge,
                     layout = layout,
-                    selected = false
+                    selected = false,
+                    muted = focus != null &&
+                            !focus.isFocusedEdge(edge.id)
                 )
             }
 
-        /*
-         * There may now be several selected edges:
-         *
-         * A ──► READY
-         * B ──► READY
-         * C ──► READY
-         */
-        graph.edges
-            .filter {
-                isSelected(
-                    edge = it,
-                    graph = graph
-                )
-            }
-            .forEach { edge ->
-
-                drawEdge(
-                    g2 = g2,
-                    edge = edge,
-                    layout = layout,
-                    selected = true
-                )
-            }
+        selectedEdges.forEach { edge ->
+            drawFocusedEdge(
+                g2 = g2,
+                edge = edge,
+                layout = layout,
+                selected = true,
+                muted = false
+            )
+        }
     }
 
     /**
@@ -168,6 +159,42 @@ internal class EdgeRenderer(
         g2.stroke = oldStroke
         g2.color = oldColor
     }
+
+
+    /**
+     * Отрисовывает переход с нужной прозрачностью.
+     *
+     * Прозрачность применяется и к маршруту стрелки,
+     * и к связанным Event, Guard и Action.
+     */
+    private fun drawFocusedEdge(
+        g2: Graphics2D,
+        edge: DiagramEdge,
+        layout: DiagramLayout,
+        selected: Boolean,
+        muted: Boolean
+    ) {
+        val graphics = g2.create() as Graphics2D
+
+        try {
+            if (muted) {
+                graphics.composite = AlphaComposite.getInstance(
+                    AlphaComposite.SRC_OVER,
+                    DiagramColors.UNFOCUSED_OPACITY
+                )
+            }
+
+            drawEdge(
+                g2 = graphics,
+                edge = edge,
+                layout = layout,
+                selected = selected
+            )
+        } finally {
+            graphics.dispose()
+        }
+    }
+
 
     // -------------------------------------------------------------------------
     // Edge labels
