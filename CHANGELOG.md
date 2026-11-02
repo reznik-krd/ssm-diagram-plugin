@@ -6,6 +6,7 @@ All notable changes to SSM Diagram are documented in this file.
 
 ### Added
 - Выгрузка в plantUML
+- Выгрузка в SVG
 
 ## [1.0.14] - 2026-11-2
 
